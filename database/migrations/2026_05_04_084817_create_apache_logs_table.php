@@ -24,7 +24,6 @@ return new class extends Migration
             $table->integer('bytes_sent');
             $table->text('referer');
             $table->text('user_agent');
-            $table->timestamps();
         });
     }
 

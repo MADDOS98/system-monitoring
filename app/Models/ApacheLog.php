@@ -8,6 +8,8 @@ class ApacheLog extends Model
 {
     protected $table = 'apache_logs';
 
+    public $timestamps = false;
+
     protected $fillable = [
         'log_time',
         'remote_host',
