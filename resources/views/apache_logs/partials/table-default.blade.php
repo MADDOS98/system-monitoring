@@ -31,8 +31,8 @@
             <td class="px-4 py-2.5 whitespace-nowrap">
                 @php
                 $methodColor = match($log->method) {
-                'GET' => 'text-live',
-                'POST' => 'text-accent',
+                'GET' => 'text-accent',
+                'POST' => 'text-live',
                 'PUT', 'PATCH' => 'text-warning',
                 'DELETE' => 'text-danger',
                 default => 'text-muted',
@@ -54,8 +54,8 @@
                 $statusColor = match(true) {
                 $log->status >= 500 => 'bg-danger/10 text-danger',
                 $log->status >= 400 => 'bg-warning/10 text-warning',
-                $log->status >= 300 => 'bg-accent/10 text-accent',
-                $log->status >= 200 => 'bg-live/10 text-live',
+                $log->status >= 300 => 'bg-accent/10 text-live',
+                $log->status >= 200 => 'bg-live/10 text-accent',
                 default => 'bg-border text-muted',
                 };
                 @endphp

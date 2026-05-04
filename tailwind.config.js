@@ -13,16 +13,16 @@ export default {
         extend: {
             colors: {
                 // Layout
-                sidebar:  '#0d0d0d',
-                main:     '#111111',
+                sidebar:  '#11141a',
+                main:     '#0c0e12',
                 panel:    '#1a1a1a',
-                border:   '#2a2a2a',
+                border:   '#1e2330',
 
                 // Brand
-                accent:   '#3b82f6',
+                accent:   '#129247',
 
                 // Status
-                live:     '#22c55e',
+                live:     '#32b3e6',
                 danger:   '#ef4444',
                 warning:  '#f59e0b',
 
