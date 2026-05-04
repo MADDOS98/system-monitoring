@@ -12,7 +12,7 @@ class ApacheLogController extends Controller
      */
     public function index()
     {
-        $logs = ApacheLog::all();
+        $logs = ApacheLog::orderByDesc('log_time')->paginate(50);
         return view('apache_logs.index', compact('logs'));
     }
 }

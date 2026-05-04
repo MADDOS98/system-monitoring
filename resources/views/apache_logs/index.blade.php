@@ -6,7 +6,7 @@
             <h1 class="text-xl font-semibold text-text">Apache Logs</h1>
             <p class="text-sm text-muted mt-0.5 font-mono">
                 Access log for <span class="font-semibold text-text">web-prod-01</span>
-                · {{ count($logs) }} entries
+                · {{ $logs ? count($logs) : 0 }} entries
             </p>
         </div>
 
