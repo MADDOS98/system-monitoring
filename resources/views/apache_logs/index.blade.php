@@ -28,7 +28,7 @@
             </select>
             <button class="flex items-center gap-2 px-3 py-1.5 bg-panel border border-border rounded-md text-xs text-label hover:text-text font-mono transition-colors duration-150">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38"/>
+                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38" />
                 </svg>
                 Refresh
             </button>
@@ -46,25 +46,22 @@
                 localStorage.setItem('logs-accordion', this.open);
             }
         }"
-        class="mb-5 border border-border rounded-lg overflow-hidden"
-    >
+        class="mb-5 border border-border rounded-lg overflow-hidden">
         {{-- Accordion trigger --}}
         <button
             @click="toggle()"
-            class="w-full flex items-center justify-between px-4 py-3 bg-sidebar hover:bg-panel transition-colors duration-150"
-        >
+            class="w-full flex items-center justify-between px-4 py-3 bg-sidebar hover:bg-panel transition-colors duration-150">
             <div class="flex items-center gap-2">
                 <svg class="w-3.5 h-3.5 text-accent" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path d="M4 6h16M4 12h16M4 18h7"/>
+                    <path d="M4 6h16M4 12h16M4 18h7" />
                 </svg>
                 <span class="text-xs font-mono font-semibold text-label uppercase tracking-widest">Quick Filters</span>
             </div>
             <svg
                 class="w-4 h-4 text-muted transition-transform duration-200"
                 :class="open ? 'rotate-180' : ''"
-                fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
-            >
-                <path d="M19 9l-7 7-7-7"/>
+                fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M19 9l-7 7-7-7" />
             </svg>
         </button>
 
@@ -77,8 +74,7 @@
             x-transition:leave="transition ease-in duration-150"
             x-transition:leave-start="opacity-100 translate-y-0"
             x-transition:leave-end="opacity-0 -translate-y-2"
-            class="border-t border-border bg-panel px-4 py-4"
-        >
+            class="border-t border-border bg-panel px-4 py-4">
             <div class="flex flex-wrap gap-2">
 
                 {{-- TOP 15 IP ACCESSORS --}}
@@ -87,12 +83,25 @@
                     class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border text-xs font-mono font-medium transition-colors duration-150
                         {{ request()->routeIs('apache-logs.top-ips')
                             ? 'bg-accent/10 border-accent text-accent'
-                            : 'bg-sidebar border-border text-label hover:border-accent hover:text-accent' }}"
-                >
+                            : 'bg-sidebar border-border text-label hover:border-accent hover:text-accent' }}">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20M12 2a15.3 15.3 0 0 0 0 20"/>
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20M12 2a15.3 15.3 0 0 0 0 20" />
                     </svg>
                     Top 15 IP Accessors
+                </a>
+
+                {{-- ACCESSES BY STATUS --}}
+                <a
+                    href="{{ route('apache-logs.by-status') }}"
+                    class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border text-xs font-mono font-medium transition-colors duration-150
+                        {{ request()->routeIs('apache-logs.by-status')
+                            ? 'bg-accent/10 border-accent text-accent'
+                            : 'bg-sidebar border-border text-label hover:border-accent hover:text-accent' }}">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2m0 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z" />
+                    </svg>
+                    Accesses by Status
                 </a>
 
                 {{-- Placeholder pentru filtre viitoare --}}
@@ -110,14 +119,14 @@
 
         {{-- Pagination --}}
         @if ($logs instanceof \Illuminate\Pagination\LengthAwarePaginator && $logs->hasPages())
-            <div class="px-4 py-3 border-t border-border bg-sidebar flex items-center justify-between">
-                <p class="text-xs text-muted font-mono">
-                    Showing {{ $logs->firstItem() }}–{{ $logs->lastItem() }} of {{ $logs->total() }} entries
-                </p>
-                <div class="text-xs font-mono">
-                    {{ $logs->links() }}
-                </div>
+        <div class="px-4 py-3 border-t border-border bg-sidebar flex items-center justify-between">
+            <p class="text-xs text-muted font-mono">
+                Showing {{ $logs->firstItem() }}–{{ $logs->lastItem() }} of {{ $logs->total() }} entries
+            </p>
+            <div class="text-xs font-mono">
+                {{ $logs->links() }}
             </div>
+        </div>
         @endif
 
     </div>

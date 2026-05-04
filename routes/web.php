@@ -18,10 +18,14 @@ Route::get('/apache-logs/top-ips', [ApacheLogController::class, 'topIps'])
     ->middleware(['auth', 'verified'])
     ->name('apache-logs.top-ips');
 
+Route::get('/apache-logs/by-status', [ApacheLogController::class, 'byStatus'])
+    ->middleware(['auth', 'verified'])
+    ->name('apache-logs.by-status');
+
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';

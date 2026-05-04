@@ -41,4 +41,17 @@ class ApacheLogController extends Controller
             'tableView' => 'apache_logs.partials.table-top-ips'
         ]);
     }
+
+    public function byStatus()
+    {
+        $logs = ApacheLog::selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->orderBy('status')
+            ->get();
+
+        return view('apache_logs.index', [
+            'logs' => $logs,
+            'tableView' => 'apache_logs.partials.table-by-status'
+        ]);
+    }
 }
