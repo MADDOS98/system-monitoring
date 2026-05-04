@@ -14,6 +14,10 @@ Route::get('/dashboard', function () {
 
 Route::get('/apache-logs', [ApacheLogController::class, 'index'])->middleware(['auth', 'verified'])->name('apache-logs');
 
+Route::get('/apache-logs/top-ips', [ApacheLogController::class, 'topIps'])
+    ->middleware(['auth', 'verified'])
+    ->name('apache-logs.top-ips');
+
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
