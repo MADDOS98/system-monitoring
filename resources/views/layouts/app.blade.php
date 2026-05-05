@@ -1,39 +1,44 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name', 'system-monitoring') }}</title>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <!-- Fonts -->
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+    <title>{{ config('app.name', 'system-monitoring') }}</title>
 
-        <!-- Scripts -->
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
-    </head>
-    <body class="font-sans antialiased bg-main text-text">
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
 
-        <div class="flex h-screen overflow-hidden">
+    <!-- Scripts -->
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @livewireStyles
+</head>
 
-            {{-- Sidebar --}}
-            @include('layouts.sidebar')
+<body class="font-sans antialiased bg-main text-text">
 
-            {{-- Main area --}}
-            <div class="ml-52 flex-1 flex flex-col overflow-auto">
+    <div class="flex h-screen overflow-hidden">
 
-                {{-- Topbar --}}
-                @include('layouts.topbar')
+        {{-- Sidebar --}}
+        @include('layouts.sidebar')
 
-                {{-- Page Content --}}
-                <main class="flex-1 p-6">
-                    {{ $slot }}
-                </main>
+        {{-- Main area --}}
+        <div class="ml-52 flex-1 flex flex-col overflow-auto">
 
-            </div>
+            {{-- Topbar --}}
+            @include('layouts.topbar')
+
+            {{-- Page Content --}}
+            <main class="flex-1 p-6">
+                {{ $slot }}
+            </main>
+
         </div>
+    </div>
 
-    </body>
+    @livewireScripts
+</body>
+
 </html>
