@@ -9,9 +9,6 @@ class ApacheLogController extends Controller
 {
     public function index()
     {
-        // Tabel principal — toate logurile paginate
-        $logs = ApacheLog::orderByDesc('log_time')->paginate(20);
-
         // Top source IPs — pentru tabelul stânga jos
         // tag și hostname nu vin din DB deocamdată, rămân null
         // Top source IPs cu breakdown statusuri per IP
@@ -67,6 +64,6 @@ class ApacheLogController extends Controller
             ])
             ->values();
 
-        return view('apache_logs.index', compact('logs', 'topIps', 'byStatus'));
+        return view('apache_logs.index', compact('topIps', 'byStatus'));
     }
 }
