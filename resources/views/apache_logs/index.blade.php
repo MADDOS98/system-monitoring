@@ -73,69 +73,6 @@
     </div>
 
     {{-- Table --}}
-    <div class="w-full rounded-lg border border-border overflow-hidden"
-        x-data="{
-             searchField: 'any',
-             searchFields: ['any', 'IP', 'URL / endpoint', 'User-Agent', 'HTTP status', 'Method', 'Request ID'],
-             searchOpen: false,
-             searchQuery: '',
-         }">
-
-        {{-- Toolbar --}}
-        <div class="flex items-center justify-between px-4 py-2.5 bg-sidebar border-b border-border">
-
-            {{-- Left: Live requests + tailing --}}
-            <div class="flex items-center gap-2">
-                <svg class="w-3.5 h-3.5 text-[#6b7280]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path d="M4 6h16M4 12h16M4 18h7" />
-                </svg>
-                <span class="text-xs font-mono font-semibold text-[#e5e7eb]">Live requests</span>
-                <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-                <span class="text-xs font-mono text-[#6b7280]">tailing</span>
-            </div>
-
-            {{-- Right: search field dropdown + search input --}}
-            <div class="flex items-center gap-2">
-
-                {{-- Search field dropdown --}}
-                <div class="relative" @click.outside="searchOpen = false">
-                    <button @click="searchOpen = !searchOpen"
-                        class="flex items-center gap-2 px-3 py-1.5 bg-panel border border-border rounded-md text-xs font-mono text-label hover:text-text transition-colors duration-150">
-                        Search: <span x-text="searchField" class="text-[#e5e7eb]"></span>
-                        <svg class="w-3 h-3 text-[#6b7280]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    <div x-show="searchOpen"
-                        x-transition:enter="transition ease-out duration-100"
-                        x-transition:enter-start="opacity-0 scale-95"
-                        x-transition:enter-end="opacity-100 scale-100"
-                        x-transition:leave="transition ease-in duration-75"
-                        x-transition:leave-start="opacity-100 scale-100"
-                        x-transition:leave-end="opacity-0 scale-95"
-                        class="absolute left-0 top-full mt-1 w-44 bg-panel border border-border rounded-md shadow-lg z-20 py-1"
-                        style="display:none">
-                        <template x-for="field in searchFields" :key="field">
-                            <button
-                                @click="searchField = field; searchOpen = false"
-                                :class="searchField === field ? 'bg-blue-600/20 text-blue-400' : 'text-[#9ca3af] hover:text-[#e5e7eb] hover:bg-[#1f1f1f]'"
-                                class="w-full text-left px-4 py-2 text-xs font-mono transition-colors duration-100"
-                                x-text="field"></button>
-                        </template>
-                    </div>
-                </div>
-
-                {{-- Search input --}}
-                <div class="flex items-center gap-2 bg-panel border border-border rounded-md px-3 py-1.5 w-52">
-                    <svg class="w-3.5 h-3.5 text-[#6b7280] flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <circle cx="11" cy="11" r="8" />
-                        <path d="m21 21-4.35-4.35" />
-                    </svg>
-                    <input type="text" x-model="searchQuery" placeholder="search live requests..."
-                        class="bg-transparent text-xs text-[#e5e7eb] font-mono border-none outline-none focus:ring-0 p-0 w-full placeholder-[#6b7280]" />
-                </div>
-            </div>
-        </div>
 
         <livewire:apache-logs-table />
 
