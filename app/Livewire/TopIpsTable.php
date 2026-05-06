@@ -10,6 +10,7 @@ class TopIpsTable extends Component
 {
     public ?int $from = null;
     public ?int $to   = null;
+    public string $tab = 'All';
 
     public function mount(): void
     {
@@ -22,6 +23,13 @@ class TopIpsTable extends Component
     {
         $this->from = (int) $from;
         $this->to   = (int) $to;
+    }
+
+    public function setTab(string $tab)
+    {
+        $this->tab = $tab;
+
+        // aici filtrezi tabelul
     }
 
     public function render()
@@ -43,20 +51,48 @@ class TopIpsTable extends Component
             ->orderByDesc('reqs')
             ->limit(15)
             ->get()
-            ->map(fn($row) => (object) [
-                'ip'          => $row->ip,
-                'hostname'    => null,
-                'tag'         => null,
-                'reqs'        => $row->reqs,
-                'total_bytes' => $row->total_bytes,
-                's2xx'        => $row->reqs > 0 ? round($row->s2xx / $row->reqs * 100) : 0,
-                's3xx'        => $row->reqs > 0 ? round($row->s3xx / $row->reqs * 100) : 0,
-                's4xx'        => $row->reqs > 0 ? round($row->s4xx / $row->reqs * 100) : 0,
-                's5xx'        => $row->reqs > 0 ? round($row->s5xx / $row->reqs * 100) : 0,
-                'last_seen'   => $row->last_seen_ts
-                    ? now()->diffForHumans(\Carbon\Carbon::createFromTimestamp($row->last_seen_ts), true) . ' ago'
-                    : '—',
-            ]);
+            ->map(function ($row) {
+
+                $total = $row->reqs ?: 1;
+
+                $okPercent   = ($row->s2xx / $total) * 100;
+                $badPercent  = (($row->s4xx + $row->s5xx) / $total) * 100;
+
+                $tag = null;
+
+                if ($okPercent >= 70) {
+                    $tag = 'TRUSTED';
+                }
+
+                if ($badPercent > 20) {
+                    $tag = 'SUSPECT';
+                }
+
+                return (object) [
+                    'ip'          => $row->ip,
+                    'hostname'    => $row->referer,
+                    'tag'         => $tag,
+
+                    'reqs'        => $row->reqs,
+                    'total_bytes' => $row->total_bytes,
+
+                    's2xx'        => round($row->s2xx / $total * 100),
+                    's3xx'        => round($row->s3xx / $total * 100),
+                    's4xx'        => round($row->s4xx / $total * 100),
+                    's5xx'        => round($row->s5xx / $total * 100),
+
+                    'last_seen'   => $row->last_seen_ts
+                        ? now()->diffForHumans(\Carbon\Carbon::createFromTimestamp($row->last_seen_ts), true) . ' ago'
+                        : '—',
+                ];
+            })
+            ->filter(function ($ip) {
+                return match ($this->tab) {
+                    'Whitelisted' => $ip->tag === 'TRUSTED',
+                    'Suspicious'  => $ip->tag === 'SUSPECT',
+                    default        => true, // All
+                };
+            });
 
         return view('livewire.top-ips-table', compact('topIps'));
     }
