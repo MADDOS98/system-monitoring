@@ -3,6 +3,9 @@
     {{-- Time Range Picker — componentă Livewire, dispatchează timeRangeChanged --}}
     <livewire:time-range-picker />
 
+    {{-- Peak Traffic Timeline --}}
+    <livewire:peak-traffic-timeline />
+
     {{-- Tabel principal cu search + paginare — componentă Livewire --}}
     <div class="w-full rounded-lg border border-border overflow-hidden">
         <livewire:apache-logs-table />
