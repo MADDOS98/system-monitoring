@@ -31,7 +31,7 @@
                 $barBgColor = match($barLevel) {
                     'normal' => 'bg-blue-600 group-hover:bg-blue-500',
                     'warning' => 'bg-orange-600 group-hover:bg-orange-500',
-                    'critical' => 'bg-red-600 group-hover:bg-red-500',
+                    'critical' => 'bg-red-700 group-hover:bg-red-600',
                     default => 'bg-gray-600 group-hover:bg-gray-500',
                 };
             @endphp
