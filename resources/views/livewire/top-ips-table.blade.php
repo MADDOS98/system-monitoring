@@ -27,8 +27,8 @@
     <div class="grid grid-cols-12 px-4 py-2 bg-sidebar border-b border-border flex-shrink-0">
         <div class="col-span-4 text-[10px] font-mono font-semibold text-[#6b7280] uppercase tracking-widest">IP / Host</div>
         <div class="col-span-2 text-[10px] font-mono font-semibold text-[#6b7280] uppercase tracking-widest">Reqs</div>
-        <div class="col-span-2 text-[10px] font-mono font-semibold text-[#6b7280] uppercase tracking-widest">Status mix</div>
-        <div class="col-span-2 text-[10px] font-mono font-semibold text-[#6b7280] uppercase tracking-widest text-right">BW</div>
+        <div class="col-span-2 text-[10px] font-mono font-semibold text-[#6b7280] uppercase tracking-widest text-center">Status mix</div>
+        <div class="col-span-2 text-[10px] font-mono font-semibold text-[#6b7280] uppercase tracking-widest text-center">BW</div>
         <div class="col-span-1 text-[10px] font-mono font-semibold text-[#6b7280] uppercase tracking-widest text-right">Last seen</div>
         <div class="col-span-1"></div>
     </div>
@@ -87,7 +87,7 @@
             </div>
 
             {{-- BW --}}
-            <div class="col-span-2 text-xs font-mono text-[#9ca3af] text-right">
+            <div class="col-span-2 text-xs font-mono text-[#9ca3af] text-center">
                 @php
                 $bytes = $ip->total_bytes ?? 0;
                 if ($bytes >= 1073741824) echo round($bytes / 1073741824, 1) . ' GB';
