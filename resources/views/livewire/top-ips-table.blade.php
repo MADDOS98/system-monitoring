@@ -71,7 +71,7 @@
                     <span class="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded {{ $tagColor }}">{{ $ip->tag }}</span>
                     @endif
                 </div>
-                @if($showTag && !empty($ip->hostname))
+                @if($showTag)
                 <div class="text-[10px] text-[#6b7280] font-mono mt-0.5 truncate">{{ $ip->hostname }}</div>
                 @endif
             </div>

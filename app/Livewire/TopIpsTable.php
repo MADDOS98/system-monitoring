@@ -50,6 +50,7 @@ class TopIpsTable extends Component
                 COUNT(*) as reqs,
                 SUM(bytes_sent) as total_bytes,
                 MAX(log_time) as last_seen_ts,
+                MAX(referer) as referer,
                 SUM(CASE WHEN status BETWEEN 200 AND 299 THEN 1 ELSE 0 END) as s2xx,
                 SUM(CASE WHEN status BETWEEN 300 AND 399 THEN 1 ELSE 0 END) as s3xx,
                 SUM(CASE WHEN status BETWEEN 400 AND 499 THEN 1 ELSE 0 END) as s4xx,
@@ -69,9 +70,15 @@ class TopIpsTable extends Component
                 if ($okPercent >= 70)  $tag = 'TRUSTED';
                 if ($badPercent > 20)  $tag = 'SUSPECT';
 
+/*                 $hostname = null;
+                if ($tag !== null && !empty($row->referer) && $row->referer !== '-') {
+                    $parsed = parse_url($row->referer);
+                    $hostname = $parsed['host'] ?? null;
+                } */
+
                 return (object) [
                     'ip'          => $row->ip,
-                    'hostname'    => $row->referer ?? null,
+                    'hostname'    => $row->referer,
                     'tag'         => $tag,
                     'reqs'        => $row->reqs,
                     'total_bytes' => $row->total_bytes,
