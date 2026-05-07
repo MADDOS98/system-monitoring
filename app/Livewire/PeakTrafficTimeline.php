@@ -51,6 +51,51 @@ class PeakTrafficTimeline extends Component
 
         $max = max($bins) ?: 1;
 
-        return view('livewire.peak-traffic-timeline', compact('bins', 'max', 'day'));
+        /**
+         * =========================
+         *  LOGICĂ PE NIVELE
+         * =========================
+         */
+
+        $values = array_values($bins);
+        $mean = array_sum($values) / count($values);
+
+        $variance = 0;
+        foreach ($values as $v) {
+            $variance += pow($v - $mean, 2);
+        }
+        $variance = $variance / count($values);
+        $std = sqrt($variance) ?: 1;
+
+        $zScores = [];
+        $levels = [];
+
+        for ($h = 0; $h < 24; $h++) {
+            $current = $bins[$h];
+
+            // Z-score
+            $z = ($current - $mean) / $std;
+            $zScores[$h] = $z;
+
+            // Vecini (local peak)
+            $prev = $bins[$h - 1] ?? 0;
+            $next = $bins[$h + 1] ?? 0;
+
+            $localPeak =
+                $current >= 50 && // prag minim anti-noise
+                $current > ($prev * 1.4) &&
+                $current > ($next * 1.4);
+
+            // Sistem pe nivele
+            if ($z >= 2.8) {
+                $levels[$h] = 'critical';
+            } elseif ($z >= 2 || $localPeak) {
+                $levels[$h] = 'warning';
+            } else {
+                $levels[$h] = 'normal';
+            }
+        }
+
+        return view('livewire.peak-traffic-timeline', compact('bins', 'max', 'day', 'levels'));
     }
 }

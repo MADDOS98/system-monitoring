@@ -27,6 +27,13 @@
                 $pct     = $max > 0 ? ($count / $max) : 0;
                 $heightPx = max(3, (int) round($pct * 108)); // 108px max bar, 3px min
                 $isSelected = $selected === $h;
+                $barLevel = $levels[$h];
+                $barBgColor = match($barLevel) {
+                    'normal' => 'bg-blue-600 group-hover:bg-blue-500',
+                    'warning' => 'bg-orange-600 group-hover:bg-orange-500',
+                    'critical' => 'bg-red-600 group-hover:bg-red-500',
+                    default => 'bg-gray-600 group-hover:bg-gray-500',
+                };
             @endphp
 
             <div
@@ -41,7 +48,7 @@
                            pointer-events-none opacity-0 group-hover:opacity-100
                            transition-opacity duration-150 whitespace-nowrap"
                 >
-                    <div class="bg-[#1a1a1a] border border-[#3a3a3a] rounded px-2 py-1 text-[10px] font-mono text-[#e5e7eb]">
+                    <div class="bg-[#1a1a1a] border border-[#3a3a3a] rounded px-2 py-1 text-[11px] font-mono text-[#e5e7eb]">
                         {{ str_pad($h, 2, '0', STR_PAD_LEFT) }}:00 — {{ number_format($count) }} req
                     </div>
                     {{-- Arrow --}}
@@ -51,7 +58,7 @@
                 {{-- Bar --}}
                 <div
                     style="height: {{ $heightPx }}px"
-                    class="w-full rounded-sm transition-all duration-200
+                    class="w-full rounded-sm transition-all duration-200 {{ $barBgColor }}
                         {{ $isSelected
                             ? 'bg-blue-500'
                             : 'bg-blue-700 group-hover:bg-blue-600' }}"
@@ -63,8 +70,8 @@
     {{-- Hour labels --}}
     <div class="flex gap-[3px] mt-1.5">
         @for ($h = 0; $h < 24; $h++)
-            <div class="flex-1 text-center text-[9px] font-mono text-[#4b5563]">
-                {{ str_pad($h, 2, '0', STR_PAD_LEFT) }}
+            <div class="flex-1 text-center text-[11px] font-mono text-gray-400">
+                {{ str_pad($h, 2, '0', STR_PAD_LEFT) }}:00
             </div>
         @endfor
     </div>
