@@ -57,12 +57,13 @@ class ApacheLogsTable extends Component
                     'URL / endpoint' => $q->where('uri', 'like', "%{$query}%"),
                     'User-Agent'   => $q->where('user_agent', 'like', "%{$query}%"),
                     'HTTP status'  => $q->where('status', 'like', "%{$query}%"),
-                    'Method'       => $q->where('method', strtoupper($query)),
+                    'Method'       => $q->where('method', 'like', "%{$query}%"),
                     default        => $q->where(function ($q2) use ($query) {
                         $q2->where('remote_host', 'like', "%{$query}%")
                            ->orWhere('uri', 'like', "%{$query}%")
                            ->orWhere('status', 'like', "%{$query}%")
-                           ->orWhere('method', $query); // method: match exact, nu LIKE
+                           ->orWhere('method', 'like', "%{$query}%")
+                           ->orWhere('user_agent', 'like', "%{$query}%");
                     }),
                 };
             })
