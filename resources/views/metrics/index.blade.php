@@ -34,7 +34,7 @@
             {{-- CPU charts --}}
         </div>
         <div x-show="tab === 'ram'">
-            {{-- RAM charts --}}
+            <livewire:ram-metrics />
         </div>
         <div x-show="tab === 'network'">
             {{-- Network charts --}}
