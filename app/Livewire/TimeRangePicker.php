@@ -10,10 +10,12 @@ class TimeRangePicker extends Component
     public string $preset = '5m';
     public string $from   = '';
     public string $to     = '';
+    public string $title  = '';
     public ?string $anchorFrom = null;
 
-    public function mount(): void
+    public function mount(string $title = ''): void
     {
+        $this->title  = $title;
         $this->preset = '5m';
 
         $now = Carbon::now();

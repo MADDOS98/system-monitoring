@@ -14,6 +14,10 @@ Route::get('/dashboard', function () {
 
 Route::get('/apache-logs', [ApacheLogController::class, 'index'])->middleware(['auth', 'verified'])->name('apache-logs');
 
+Route::get('/metrics', function () {
+    return view('metrics.index');
+})->middleware(['auth', 'verified'])->name('metrics');
+
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

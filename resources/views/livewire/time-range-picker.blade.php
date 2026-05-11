@@ -2,7 +2,7 @@
 
     {{-- Left: title + window --}}
     <div>
-        <h1 class="text-xl font-semibold text-text">Apache Traffic</h1>
+        <h1 class="text-xl font-semibold text-text">{{ $title }}</h1>
         <p class="text-xs text-muted font-mono mt-1">
             Window:
             <span class="text-label">

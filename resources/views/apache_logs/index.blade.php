@@ -1,7 +1,7 @@
 <x-app-layout>
 
     {{-- Time Range Picker — componentă Livewire, dispatchează timeRangeChanged --}}
-    <livewire:time-range-picker />
+    <livewire:time-range-picker title="Apache Traffic" />
 
     {{-- Peak Traffic Timeline --}}
     <livewire:peak-traffic-timeline />
