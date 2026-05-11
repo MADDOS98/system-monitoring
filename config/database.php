@@ -44,6 +44,17 @@ return [
             'transaction_mode' => 'DEFERRED',
         ],
 
+        'system_metrics' => [
+            'driver' => 'sqlite',
+            'database' => env('DB_METRICS_DATABASE', database_path('system_metrics.sqlite')),
+            'prefix' => '',
+            'foreign_key_constraints' => true,
+            'busy_timeout' => null,
+            'journal_mode' => null,
+            'synchronous' => null,
+            'transaction_mode' => 'DEFERRED',
+        ],
+
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DB_URL'),
