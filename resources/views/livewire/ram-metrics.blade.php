@@ -143,7 +143,7 @@
                                 color: '#6b7280',
                                 font: {
                                     family: 'monospace',
-                                    size: 10
+                                    size: 11
                                 },
                                 maxTicksLimit: 8
                             },
@@ -159,7 +159,7 @@
                                 color: '#6b7280',
                                 font: {
                                     family: 'monospace',
-                                    size: 10
+                                    size: 11
                                 }
                             },
                             grid: {
