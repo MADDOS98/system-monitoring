@@ -44,8 +44,12 @@ class NetworkMetrics extends Component
 
         $chartData = $this->getChartData();
 
+        $bucketSeconds = $this->resolveBucketSeconds(max(1, $diffSeconds));
+        $labelFormat   = $this->resolveLabelFormat($bucketSeconds, max(1, $diffSeconds));
+
         return view('livewire.network-metrics', compact(
-            'rxBytes', 'txBytes', 'chartData', 'periodLabel'
+            'rxBytes', 'txBytes', 'chartData', 'periodLabel',
+            'bucketSeconds', 'labelFormat'
         ));
     }
 

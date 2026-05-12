@@ -12,6 +12,7 @@ class TimeRangePicker extends Component
     public string $to     = '';
     public string $title  = '';
     public ?string $anchorFrom = null;
+    public bool $live = true;
 
     public function mount(string $title = ''): void
     {
@@ -24,6 +25,7 @@ class TimeRangePicker extends Component
         $this->to   = $now->format('Y-m-d\TH:i');
 
         $this->anchorFrom = $this->to;
+        $this->live       = true;
     }
 
     public function applyPreset(string $preset): void
@@ -36,7 +38,9 @@ class TimeRangePicker extends Component
             return;
         }
 
-        if (!$this->anchorFrom) {
+        if ($this->live) {
+            $this->anchorFrom = Carbon::now()->format('Y-m-d\TH:i');
+        } elseif (!$this->anchorFrom) {
             $this->anchorFrom = $this->from ?: now()->format('Y-m-d\TH:i');
         }
 
@@ -53,7 +57,12 @@ class TimeRangePicker extends Component
     public function setNow(): void
     {
         $offsets = ['5m' => 5, '1h' => 60, '24h' => 1440];
-        $minutes = $offsets[$this->preset] ?? 5;
+
+        if (!isset($offsets[$this->preset])) {
+            $this->preset = '5m';
+        }
+
+        $minutes = $offsets[$this->preset];
 
         $now = Carbon::now();
 
@@ -61,6 +70,7 @@ class TimeRangePicker extends Component
         $this->from = $now->copy()->subMinutes($minutes)->format('Y-m-d\TH:i');
 
         $this->anchorFrom = $this->to;
+        $this->live       = true;
 
         $this->dispatchTimeRange();
     }
@@ -68,14 +78,16 @@ class TimeRangePicker extends Component
     public function updatedFrom(): void
     {
         $this->preset = 'custom';
-
         $this->anchorFrom = $this->from;
+        $this->live = false;
 
         $this->dispatchTimeRange();
     }
 
     public function updatedTo(): void
     {
+        $this->live = false;
+
         $this->dispatchTimeRange();
     }
 

@@ -1,17 +1,27 @@
-<div class="flex items-start justify-between mb-5">
+<div
+    wire:key="time-range-picker"
+    data-live="{{ $live ? '1' : '0' }}"
+    data-preset="{{ $preset }}"
+    class="flex items-start justify-between mb-5">
 
     {{-- Left: title + window --}}
     <div>
         <h1 class="text-xl font-semibold text-text">{{ $title }}</h1>
         <p class="text-xs text-muted font-mono mt-1">
             Window:
-            <span class="text-label">
+            <span data-window-from class="text-label">
                 {{ $from ? \Carbon\Carbon::createFromFormat('Y-m-d\TH:i', $from)->format('Y-m-d H:i') : '—' }}
             </span>
             <span class="mx-1">—</span>
-            <span class="text-label">
+            <span data-window-to class="text-label">
                 {{ $to ? \Carbon\Carbon::createFromFormat('Y-m-d\TH:i', $to)->format('Y-m-d H:i') : '—' }}
             </span>
+            @if($live)
+                <span class="ml-2 inline-flex items-center gap-1 text-emerald-400">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    live
+                </span>
+            @endif
         </p>
     </div>
 
@@ -59,3 +69,46 @@
 
     </div>
 </div>
+
+@script
+<script>
+    (function () {
+        const componentId = '{{ $this->getId() }}';
+        const PRESET_MINUTES = { '5m': 5, '1h': 60, '24h': 1440 };
+
+        function pad(n) { return String(n).padStart(2, '0'); }
+
+        function formatYmdHm(d) {
+            return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+
+        function getState() {
+            const el = document.querySelector('[wire\\:id="' + componentId + '"]');
+            return {
+                live:   el?.dataset.live === '1',
+                preset: el?.dataset.preset || '',
+                el,
+            };
+        }
+
+        function tick() {
+            const { live, preset, el } = getState();
+            if (!live || !el) return;
+
+            const minutes = PRESET_MINUTES[preset];
+            if (!minutes) return;
+
+            const now  = new Date();
+            const from = new Date(now.getTime() - minutes * 60 * 1000);
+
+            const fromEl = el.querySelector('[data-window-from]');
+            const toEl   = el.querySelector('[data-window-to]');
+            if (fromEl) fromEl.textContent = formatYmdHm(from);
+            if (toEl)   toEl.textContent   = formatYmdHm(now);
+        }
+
+        setInterval(tick, 1000);
+        tick();
+    })();
+</script>
+@endscript

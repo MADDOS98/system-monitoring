@@ -30,9 +30,7 @@ class RamMetrics extends Component
     {
         $tz = config('app.timezone');
 
-        $latest = RamMetric::whereBetween('collected_at', [$this->fromTs, $this->toTs])
-            ->orderByDesc('collected_at')
-            ->first();
+        $latest = RamMetric::orderByDesc('collected_at')->first();
 
         $totalKb = $latest?->total_kb ?? 0;
         $usedKb  = $latest?->used_kb  ?? 0;
@@ -48,8 +46,12 @@ class RamMetrics extends Component
 
         $chartData = $this->getChartData();
 
+        $bucketSeconds = $this->resolveBucketSeconds(max(1, $diffSeconds));
+        $labelFormat   = $this->resolveLabelFormat($bucketSeconds, max(1, $diffSeconds));
+
         return view('livewire.ram-metrics', compact(
-            'totalKb', 'usedKb', 'freeKb', 'usedPct', 'chartData', 'periodLabel'
+            'totalKb', 'usedKb', 'freeKb', 'usedPct', 'chartData', 'periodLabel',
+            'bucketSeconds', 'labelFormat'
         ));
     }
 
