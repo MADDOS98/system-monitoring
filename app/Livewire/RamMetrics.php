@@ -55,23 +55,21 @@ class RamMetrics extends Component
 
     private function getChartData(): array
     {
-        $tz            = config('app.timezone');
-        $diffSeconds   = $this->toTs - $this->fromTs;
+        $tz          = config('app.timezone');
+        $diffSeconds = $this->toTs - $this->fromTs;
 
         if ($diffSeconds <= 0) {
             return ['labels' => [], 'values' => []];
         }
 
-        // Max 120 puncte vizibile in chart
-        $maxPoints     = 120;
-        $bucketSeconds = max(1, (int) ceil($diffSeconds / $maxPoints));
+        $bucketSeconds = $this->resolveBucketSeconds($diffSeconds);
         $bucketCount   = (int) ceil($diffSeconds / $bucketSeconds);
 
         $rows = RamMetric::whereBetween('collected_at', [$this->fromTs, $this->toTs])
             ->orderBy('collected_at')
             ->get(['collected_at', 'used_kb']);
 
-        // Initializam toate bucket-urile (chiar daca sunt goale) ca sa acopere intreaga perioada
+        // Toate bucket-urile pornesc cu 0 — daca nu au date raman 0
         $buckets = [];
         for ($i = 0; $i < $bucketCount; $i++) {
             $buckets[$i] = [
@@ -91,22 +89,50 @@ class RamMetrics extends Component
             $buckets[$key]['count'] += 1;
         }
 
-        // Format label dinamic in functie de durata totala
-        $labelFormat = $diffSeconds >= 86400 ? 'M j H:i' : 'H:i';
+        $labelFormat = $this->resolveLabelFormat($bucketSeconds, $diffSeconds);
 
         $labels = [];
         $values = [];
-        $lastValue = null;
-
         foreach ($buckets as $b) {
             $labels[] = Carbon::createFromTimestamp($b['ts'], $tz)->format($labelFormat);
-            if ($b['count'] > 0) {
-                $lastValue = $b['sum'] / $b['count'] / (1024 * 1024);
-            }
-            // Daca bucket-ul e gol, folosim ultima valoare cunoscuta (sau null la inceput)
-            $values[] = $lastValue !== null ? round($lastValue, 2) : null;
+            $values[] = $b['count'] > 0
+                ? round($b['sum'] / $b['count'] / (1024 * 1024), 2)
+                : 0;
         }
 
         return ['labels' => $labels, 'values' => $values];
+    }
+
+    /**
+     * Regula generala pentru toate metricile:
+     *   < 20 min       -> 1 secunda
+     *   20 - 100 min   -> 5 secunde
+     *   100 min - 12h  -> 1 minut
+     *   12h - 3 zile   -> 5 minute
+     *   3 - 14 zile    -> 15 minute
+     *   14 - 60 zile   -> 1 ora
+     *   > 60 zile      -> 1 zi
+     */
+    private function resolveBucketSeconds(int $diffSeconds): int
+    {
+        $minutes = $diffSeconds / 60;
+
+        return match (true) {
+            $minutes <  20     => 1,
+            $minutes <  100    => 5,
+            $minutes <  720    => 60,      // 12h
+            $minutes <  4320   => 300,     // 3 zile
+            $minutes <  20160  => 900,     // 14 zile
+            $minutes <  86400  => 3600,    // 60 zile
+            default            => 86400,
+        };
+    }
+
+    private function resolveLabelFormat(int $bucketSeconds, int $diffSeconds): string
+    {
+        if ($bucketSeconds < 60)     return 'H:i:s';
+        if ($diffSeconds   < 86400)  return 'H:i';
+        if ($bucketSeconds >= 86400) return 'M j';
+        return 'M j H:i';
     }
 }
