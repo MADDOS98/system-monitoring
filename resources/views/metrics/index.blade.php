@@ -37,7 +37,7 @@
             <livewire:ram-metrics />
         </div>
         <div x-show="tab === 'network'">
-            {{-- Network charts --}}
+            <livewire:network-metrics />
         </div>
         <div x-show="tab === 'disk'">
             {{-- Disk charts --}}
