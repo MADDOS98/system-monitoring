@@ -31,7 +31,7 @@
         </div>
 
         <div x-show="tab === 'cpu'">
-            {{-- CPU charts --}}
+            <livewire:cpu-metrics />
         </div>
         <div x-show="tab === 'ram'">
             <livewire:ram-metrics />
