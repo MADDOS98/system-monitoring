@@ -25,5 +25,6 @@ class DatabaseSeeder extends Seeder
         $this->call(ApacheLogsSeeder::class);
         $this->call(RamMetricsSeeder::class);
         $this->call(NetworkMetricsSeeder::class);
+        $this->call(DiskMetricsSeeder::class);
     }
 }
