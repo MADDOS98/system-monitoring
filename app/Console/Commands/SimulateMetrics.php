@@ -15,8 +15,8 @@ class SimulateMetrics extends Command
     private float $ramPct = 0.45;
 
     // Network: state persistent pentru a face traficul sa aiba inertie
-    private float $rxLevel = 100_000;
-    private float $txLevel = 800_000;
+    private float $rxLevel = 1_800_000;
+    private float $txLevel = 2_500_000;
 
     // Spike-uri Network in desfasurare (countdown de secunde)
     private int $rxBurstLeft = 0;
@@ -122,16 +122,16 @@ class SimulateMetrics extends Command
     {
         // Baseline traffic per minut (folosit ca level "natural")
         [$baseRx, $baseTx] = match (true) {
-            $hour >= 0  && $hour <= 5  => [   10_000,    80_000],
-            $hour >= 6  && $hour <= 9  => [  150_000, 1_200_000],
-            $hour >= 10 && $hour <= 18 => [  400_000, 3_200_000],
-            default                    => [   80_000,   640_000],
+            $hour >= 0  && $hour <= 5  => [  200_000,    300_000],
+            $hour >= 6  && $hour <= 9  => [ 1_500_000,  2_000_000],
+            $hour >= 10 && $hour <= 18 => [ 3_500_000,  4_500_000],
+            default                    => [ 1_000_000,  1_400_000],
         };
 
         // Burst-uri independente RX / TX: ~0.5% sansa sa porneasca
         if ($this->rxBurstLeft <= 0 && mt_rand(1, 200) <= 1) {
-            $this->rxBurstLeft = mt_rand(3, 10);
-            $this->rxBurstMag  = mt_rand(800_000, 3_000_000);
+            $this->rxBurstLeft = mt_rand(3, 12);
+            $this->rxBurstMag  = mt_rand(3_000_000, 10_000_000);
         }
         if ($this->txBurstLeft <= 0 && mt_rand(1, 200) <= 1) {
             $this->txBurstLeft = mt_rand(5, 15);
@@ -140,11 +140,11 @@ class SimulateMetrics extends Command
 
         // Drift catre baseline + zgomot mediu
         $this->rxLevel += ($baseRx - $this->rxLevel) * 0.1;
-        $this->rxLevel += mt_rand(-15_000, 15_000);
+        $this->rxLevel += mt_rand(-120_000, 120_000);
         $this->txLevel += ($baseTx - $this->txLevel) * 0.1;
-        $this->txLevel += mt_rand(-120_000, 120_000);
+        $this->txLevel += mt_rand(-150_000, 150_000);
 
-        $rx = (int) max(1_000, $this->rxLevel);
+        $rx = (int) max(2_000, $this->rxLevel);
         $tx = (int) max(5_000, $this->txLevel);
 
         if ($this->rxBurstLeft > 0) {

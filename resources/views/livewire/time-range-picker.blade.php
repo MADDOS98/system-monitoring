@@ -32,6 +32,7 @@
         <div class="flex items-center gap-2 bg-panel border border-border rounded-md px-3 py-1.5">
             <span class="text-xs text-muted font-mono">From</span>
             <input
+                data-from-input
                 type="datetime-local"
                 wire:model.live="from"
                 class="bg-transparent text-xs text-text font-mono border-none outline-none focus:ring-0 p-0" />
@@ -42,6 +43,7 @@
         <div class="flex items-center gap-2 bg-panel border border-border rounded-md px-3 py-1.5">
             <span class="text-xs text-muted font-mono">To</span>
             <input
+                data-to-input
                 type="datetime-local"
                 wire:model.live="to"
                 class="bg-transparent text-xs text-text font-mono border-none outline-none focus:ring-0 p-0" />
@@ -82,6 +84,10 @@
             return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
         }
 
+        function formatDatetimeLocal(d) {
+            return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+
         function getState() {
             const el = document.querySelector('[wire\\:id="' + componentId + '"]');
             return {
@@ -101,10 +107,19 @@
             const now  = new Date();
             const from = new Date(now.getTime() - minutes * 60 * 1000);
 
+            // Display text (Window: ... — ...)
             const fromEl = el.querySelector('[data-window-from]');
             const toEl   = el.querySelector('[data-window-to]');
             if (fromEl) fromEl.textContent = formatYmdHm(from);
             if (toEl)   toEl.textContent   = formatYmdHm(now);
+
+            // Input "From" — value setat programatic NU declanseaza event,
+            // deci wire:model.live nu sincronizeaza, $live ramane true.
+            // Nu suprascriem cand inputul are focus (user-ul ar putea sa scrie).
+            const fromInput = el.querySelector('[data-from-input]');
+            if (fromInput && document.activeElement !== fromInput) {
+                fromInput.value = formatDatetimeLocal(from);
+            }
         }
 
         setInterval(tick, 1000);

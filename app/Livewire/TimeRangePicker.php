@@ -11,75 +11,53 @@ class TimeRangePicker extends Component
     public string $from   = '';
     public string $to     = '';
     public string $title  = '';
-    public ?string $anchorFrom = null;
     public bool $live = true;
+
+    private const OFFSETS = ['5m' => 5, '1h' => 60, '24h' => 1440];
 
     public function mount(string $title = ''): void
     {
         $this->title  = $title;
         $this->preset = '5m';
+        $this->live   = true;
 
-        $now = Carbon::now();
-
-        $this->from = $now->copy()->subMinutes(5)->format('Y-m-d\TH:i');
-        $this->to   = $now->format('Y-m-d\TH:i');
-
-        $this->anchorFrom = $this->to;
-        $this->live       = true;
+        $this->refreshLiveTimes();
     }
 
     public function applyPreset(string $preset): void
     {
-        $this->preset = $preset;
-
-        $offsets = ['5m' => 5, '1h' => 60, '24h' => 1440];
-
-        if (!isset($offsets[$preset])) {
+        if ($preset === 'custom') {
+            $this->preset = 'custom';
+            $this->live   = false;
             return;
         }
 
-        if ($this->live) {
-            $this->anchorFrom = Carbon::now()->format('Y-m-d\TH:i');
-        } elseif (!$this->anchorFrom) {
-            $this->anchorFrom = $this->from ?: now()->format('Y-m-d\TH:i');
+        if (!isset(self::OFFSETS[$preset])) {
+            return;
         }
 
-        $base = Carbon::createFromFormat('Y-m-d\TH:i', $this->anchorFrom);
+        $this->preset = $preset;
+        $this->live   = true;
 
-        $minutes = $offsets[$preset];
-
-        $this->to   = $base->format('Y-m-d\TH:i');
-        $this->from = $base->copy()->subMinutes($minutes)->format('Y-m-d\TH:i');
-
+        $this->refreshLiveTimes();
         $this->dispatchTimeRange();
     }
 
     public function setNow(): void
     {
-        $offsets = ['5m' => 5, '1h' => 60, '24h' => 1440];
-
-        if (!isset($offsets[$this->preset])) {
+        if (!isset(self::OFFSETS[$this->preset])) {
             $this->preset = '5m';
         }
+        $this->live = true;
 
-        $minutes = $offsets[$this->preset];
-
-        $now = Carbon::now();
-
-        $this->to   = $now->format('Y-m-d\TH:i');
-        $this->from = $now->copy()->subMinutes($minutes)->format('Y-m-d\TH:i');
-
-        $this->anchorFrom = $this->to;
-        $this->live       = true;
-
+        $this->refreshLiveTimes();
         $this->dispatchTimeRange();
     }
 
     public function updatedFrom(): void
     {
         $this->preset = 'custom';
-        $this->anchorFrom = $this->from;
-        $this->live = false;
+        $this->live   = false;
 
         $this->dispatchTimeRange();
     }
@@ -91,8 +69,39 @@ class TimeRangePicker extends Component
         $this->dispatchTimeRange();
     }
 
+    /**
+     * In live mode, $from/$to sunt derivate din "now" + preset.
+     * Aceasta metoda e apelata la mount, la fiecare actiune utilizator si la render.
+     */
+    private function refreshLiveTimes(): void
+    {
+        if (!$this->live) {
+            return;
+        }
+        if (!isset(self::OFFSETS[$this->preset])) {
+            return;
+        }
+
+        $now = Carbon::now();
+        $this->to   = $now->format('Y-m-d\TH:i');
+        $this->from = $now->copy()->subMinutes(self::OFFSETS[$this->preset])->format('Y-m-d\TH:i');
+    }
+
     private function dispatchTimeRange(): void
     {
+        // In live mode timestamp-urile vin direct din now() la precizie de secunda,
+        // nu prin string-urile $from/$to (acelea sunt doar pentru afisare la nivel de minut).
+        if ($this->live && isset(self::OFFSETS[$this->preset])) {
+            $now = Carbon::now();
+            $this->dispatch(
+                'setTimeRange',
+                (string) $now->copy()->subMinutes(self::OFFSETS[$this->preset])->timestamp,
+                (string) $now->timestamp
+            );
+            return;
+        }
+
+        // Custom mode: parsam string-urile (user-ul edit-eaza la nivel de minut).
         if (empty($this->from) || empty($this->to)) {
             return;
         }
@@ -105,6 +114,9 @@ class TimeRangePicker extends Component
 
     public function render()
     {
+        // Tinem $from/$to la zi inainte de fiecare randare in live mode.
+        $this->refreshLiveTimes();
+
         return view('livewire.time-range-picker');
     }
 }
