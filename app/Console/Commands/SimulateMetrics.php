@@ -74,16 +74,20 @@ class SimulateMetrics extends Command
     {
         $hour = (int) date('G', $ts);
 
-        $ramRow = $this->buildRamRow($ts, $hour);
-        $netRow = $this->buildNetworkRow($ts, $hour);
-
-        $diskIoRow    = $this->buildDiskIoRow($ts, $hour);
-        $diskUsageRow = $this->buildDiskUsageRow($ts);
+        $ramRow    = $this->buildRamRow($ts, $hour);
+        $netRow    = $this->buildNetworkRow($ts, $hour);
+        $diskIoRow = $this->buildDiskIoRow($ts, $hour);
 
         DB::connection('system_metrics')->table('ram_metrics')->insert($ramRow);
         DB::connection('system_metrics')->table('network_metrics')->insert($netRow);
         DB::connection('system_metrics')->table('disk_io_metrics')->insert($diskIoRow);
-        DB::connection('system_metrics')->table('disk_usage_metrics')->insert($diskUsageRow);
+
+        // disk_usage se inregistreaza o data pe minut
+        $diskUsageRow = null;
+        if ($ts % 60 === 0) {
+            $diskUsageRow = $this->buildDiskUsageRow($ts);
+            DB::connection('system_metrics')->table('disk_usage_metrics')->insert($diskUsageRow);
+        }
 
         try {
             MetricCollected::dispatch('ram', $ts, [
@@ -101,10 +105,12 @@ class SimulateMetrics extends Command
                 'write_bytes' => $diskIoRow['write_bytes'],
             ]);
 
-            MetricCollected::dispatch('disk_usage', $ts, [
-                'total_bytes' => $diskUsageRow['total_bytes'],
-                'used_bytes'  => $diskUsageRow['used_bytes'],
-            ]);
+            if ($diskUsageRow !== null) {
+                MetricCollected::dispatch('disk_usage', $ts, [
+                    'total_bytes' => $diskUsageRow['total_bytes'],
+                    'used_bytes'  => $diskUsageRow['used_bytes'],
+                ]);
+            }
         } catch (\Throwable $e) {
             // Reverb e oprit sau inaccesibil — continuam fara broadcast
             $this->warn('Broadcast failed: ' . $e->getMessage());

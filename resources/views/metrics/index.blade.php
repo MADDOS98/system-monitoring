@@ -40,7 +40,7 @@
             <livewire:network-metrics />
         </div>
         <div x-show="tab === 'disk'">
-            {{-- Disk charts --}}
+            <livewire:disk-metrics />
         </div>
 
     </div>
