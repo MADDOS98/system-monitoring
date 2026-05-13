@@ -42,8 +42,30 @@ class SimulateMetrics extends Command
     private int $diskTotalBytes = 536_870_912_000; // 500 GB
     private float $diskUsedBytes = 322_122_547_200;  // 60%
 
+    // CPU: stare persistenta cu inertie
+    private const CPU_CORE_COUNT = 8;
+    private float $cpuTotalUsage = 25.0;
+    private array $cpuCoreBias   = [];
+
+    // Spike CPU in desfasurare (countdown secunde)
+    private int $cpuSpikeLeft = 0;
+    private int $cpuSpikeMag  = 0;
+
+    // Hot core: un proces pin-uieste un core (countdown secunde)
+    private int $hotCore     = -1;
+    private int $hotCoreLeft = 0;
+
+    // Stolen usage spike (hypervisor incarcat, countdown secunde)
+    private int $stolenSpikeLeft = 0;
+    private float $stolenSpikeMag = 0;
+
     public function handle(): int
     {
+        // Bias per core: stabilit o data per rulare
+        for ($c = 0; $c < self::CPU_CORE_COUNT; $c++) {
+            $this->cpuCoreBias[$c] = mt_rand(-8, 12);
+        }
+
         if (!$this->option('loop')) {
             $this->insertTick(time());
             $this->info('Inserted 1 row in each metrics table.');
@@ -77,10 +99,12 @@ class SimulateMetrics extends Command
         $ramRow    = $this->buildRamRow($ts, $hour);
         $netRow    = $this->buildNetworkRow($ts, $hour);
         $diskIoRow = $this->buildDiskIoRow($ts, $hour);
+        $cpuRow    = $this->buildCpuRow($ts, $hour);
 
         DB::connection('system_metrics')->table('ram_metrics')->insert($ramRow);
         DB::connection('system_metrics')->table('network_metrics')->insert($netRow);
         DB::connection('system_metrics')->table('disk_io_metrics')->insert($diskIoRow);
+        DB::connection('system_metrics')->table('cpu_metrics')->insert($cpuRow);
 
         // disk_usage se inregistreaza o data pe minut
         $diskUsageRow = null;
@@ -103,6 +127,12 @@ class SimulateMetrics extends Command
             MetricCollected::dispatch('disk_io', $ts, [
                 'read_bytes'  => $diskIoRow['read_bytes'],
                 'write_bytes' => $diskIoRow['write_bytes'],
+            ]);
+
+            MetricCollected::dispatch('cpu', $ts, [
+                'total_usage'    => $cpuRow['total_usage'],
+                'per_core_usage' => json_decode($cpuRow['per_core_usage'], true),
+                'stolen_usage'   => $cpuRow['stolen_usage'],
             ]);
 
             if ($diskUsageRow !== null) {
@@ -269,6 +299,75 @@ class SimulateMetrics extends Command
             'collected_at' => $ts,
             'total_bytes'  => $this->diskTotalBytes,
             'used_bytes'   => (int) $this->diskUsedBytes,
+        ];
+    }
+
+    private function buildCpuRow(int $ts, int $hour): array
+    {
+        // Target pe baza orei
+        $target = match (true) {
+            $hour >= 0  && $hour <= 5  => 12.0,
+            $hour >= 6  && $hour <= 9  => 32.0,
+            $hour >= 10 && $hour <= 18 => 55.0,
+            default                    => 28.0,
+        };
+
+        // Spike CPU: build job / request burst (~0.3% sansa)
+        if ($this->cpuSpikeLeft <= 0 && mt_rand(1, 300) === 1) {
+            $this->cpuSpikeLeft = mt_rand(5, 20);
+            $this->cpuSpikeMag  = mt_rand(20, 40);
+        }
+
+        // Drift catre target + zgomot
+        $this->cpuTotalUsage += ($target - $this->cpuTotalUsage) * 0.05;
+        $this->cpuTotalUsage += mt_rand(-200, 200) / 100;
+
+        if ($this->cpuSpikeLeft > 0) {
+            $this->cpuTotalUsage += $this->cpuSpikeMag * mt_rand(70, 100) / 100 * 0.3;
+            $this->cpuSpikeLeft--;
+        }
+
+        $this->cpuTotalUsage = max(2.0, min(98.0, $this->cpuTotalUsage));
+
+        // Hot core: ~0.1% sansa sa porneasca, dureaza 30-180s
+        if ($this->hotCoreLeft <= 0 && mt_rand(1, 1000) === 1) {
+            $this->hotCore     = mt_rand(0, self::CPU_CORE_COUNT - 1);
+            $this->hotCoreLeft = mt_rand(30, 180);
+        }
+
+        // Distribuie pe cores
+        $perCore = [];
+        for ($c = 0; $c < self::CPU_CORE_COUNT; $c++) {
+            $coreUsage = $this->cpuTotalUsage + $this->cpuCoreBias[$c] + mt_rand(-500, 500) / 100;
+
+            if ($c === $this->hotCore && $this->hotCoreLeft > 0) {
+                $coreUsage = max($coreUsage, mt_rand(80, 100));
+            }
+
+            $perCore[] = round(max(0, min(100, $coreUsage)), 1);
+        }
+
+        if ($this->hotCoreLeft > 0) {
+            $this->hotCoreLeft--;
+        }
+
+        // Stolen usage: pe mediu 1-5%, spike rar 3-15% (hypervisor incarcat)
+        if ($this->stolenSpikeLeft <= 0 && mt_rand(1, 400) === 1) {
+            $this->stolenSpikeLeft = mt_rand(3, 15);
+            $this->stolenSpikeMag  = mt_rand(300, 1500) / 100;
+        }
+
+        $stolenUsage = mt_rand(100, 500) / 100;
+        if ($this->stolenSpikeLeft > 0) {
+            $stolenUsage = $this->stolenSpikeMag;
+            $this->stolenSpikeLeft--;
+        }
+
+        return [
+            'collected_at'   => $ts,
+            'total_usage'    => round($this->cpuTotalUsage, 2),
+            'per_core_usage' => json_encode($perCore),
+            'stolen_usage'   => round($stolenUsage, 2),
         ];
     }
 }
