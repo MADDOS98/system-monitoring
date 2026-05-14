@@ -5,6 +5,7 @@ namespace App\Livewire;
 use Livewire\Component;
 use Livewire\Attributes\On;
 use App\Models\NetworkMetric;
+use App\Models\ConnectionMetric;
 use Carbon\Carbon;
 
 class NetworkMetrics extends Component
@@ -35,6 +36,35 @@ class NetworkMetrics extends Component
         $rxBytes = $latest?->rx_bytes ?? 0;
         $txBytes = $latest?->tx_bytes ?? 0;
 
+        // Connection metrics: ultima inregistrare comuna pentru toate IP-urile
+        $latestConnTs = ConnectionMetric::max('collected_at') ?? 0;
+        $connRows     = $latestConnTs > 0
+            ? ConnectionMetric::where('collected_at', $latestConnTs)->get()
+            : collect();
+
+        $totalEstablished = 0;
+        $totalClosed      = 0;
+        $totalOther       = 0;
+        $byIp             = [];
+
+        foreach ($connRows as $row) {
+            $cat = $this->categorizeStates($row->state_counts ?? []);
+            $totalEstablished += $cat['established'];
+            $totalClosed      += $cat['closed'];
+            $totalOther       += $cat['other'];
+            $byIp[] = [
+                'ip'          => $row->local_ip,
+                'total'       => $row->total_connections,
+                'established' => $cat['established'],
+                'closed'      => $cat['closed'],
+                'other'       => $cat['other'],
+            ];
+        }
+
+        usort($byIp, fn($a, $b) => $b['total'] <=> $a['total']);
+
+        $closedOther = $totalClosed + $totalOther;
+
         $diffSeconds = $this->toTs - $this->fromTs;
         $labelFormat = $diffSeconds >= 86400 ? 'Y-m-d H:i' : 'H:i';
 
@@ -49,8 +79,36 @@ class NetworkMetrics extends Component
 
         return view('livewire.network-metrics', compact(
             'rxBytes', 'txBytes', 'chartData', 'periodLabel',
-            'bucketSeconds', 'labelFormat'
+            'bucketSeconds', 'labelFormat',
+            'totalEstablished', 'closedOther', 'byIp'
         ));
+    }
+
+    /**
+     * Imparte un dictionar state => count in 3 categorii:
+     *   established = ESTABLISHED
+     *   closed      = stari de inchidere (CLOSE, CLOSE_WAIT, TIME_WAIT, FIN_WAIT1/2, LAST_ACK, CLOSING)
+     *   other       = orice altceva (LISTEN, SYN_SENT, SYN_RECV, etc.)
+     */
+    private function categorizeStates(array $stateCounts): array
+    {
+        $closedStates = ['CLOSE', 'CLOSE_WAIT', 'TIME_WAIT', 'FIN_WAIT1', 'FIN_WAIT2', 'LAST_ACK', 'CLOSING'];
+
+        $est = 0;
+        $closed = 0;
+        $other = 0;
+
+        foreach ($stateCounts as $state => $count) {
+            if ($state === 'ESTABLISHED') {
+                $est += $count;
+            } elseif (in_array($state, $closedStates, true)) {
+                $closed += $count;
+            } else {
+                $other += $count;
+            }
+        }
+
+        return ['established' => $est, 'closed' => $closed, 'other' => $other];
     }
 
     private function getChartData(): array

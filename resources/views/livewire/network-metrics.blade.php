@@ -8,12 +8,12 @@
         $txMbps = round($txBytes * 8 / 60 / 1_000_000, 2);
     @endphp
 
-    {{-- Card 1: Latest RX / TX --}}
-    <div class="grid grid-cols-2 gap-4 mb-4">
+    {{-- Card 1: Latest RX / TX + Connections --}}
+    <div class="grid grid-cols-4 gap-4 mb-4">
 
         <div class="rounded-lg border border-neutral-800 px-5 py-4">
-            <p class="text-xs font-mono text-neutral-500 mb-1">
-                <span class="text-emerald-400">↓ RX</span>
+            <p class="text-xs font-mono text-neutral-500 uppercase tracking-widest mb-1">
+                <span class="text-emerald-400">↓ Inbound (RX)</span>
             </p>
             <p class="text-2xl font-semibold text-neutral-100">
                 <span data-net-rx-mbps>{{ $rxMbps }}</span>
@@ -22,12 +22,26 @@
         </div>
 
         <div class="rounded-lg border border-neutral-800 px-5 py-4">
-            <p class="text-xs font-mono text-neutral-500 mb-1">
-                <span class="text-amber-400">↑ TX</span>
+            <p class="text-xs font-mono text-neutral-500 uppercase tracking-widest mb-1">
+                <span class="text-amber-400">↑ Outbound (TX)</span>
             </p>
             <p class="text-2xl font-semibold text-neutral-100">
                 <span data-net-tx-mbps>{{ $txMbps }}</span>
                 <span class="text-sm font-normal text-neutral-400">Mbps</span>
+            </p>
+        </div>
+
+        <div class="rounded-lg border border-neutral-800 px-5 py-4">
+            <p class="text-xs font-mono text-neutral-500 uppercase tracking-widest mb-1">Established</p>
+            <p class="text-2xl font-semibold text-neutral-100">
+                <span data-net-established>{{ $totalEstablished }}</span>
+            </p>
+        </div>
+
+        <div class="rounded-lg border border-neutral-800 px-5 py-4">
+            <p class="text-xs font-mono text-neutral-500 uppercase tracking-widest mb-1">Closed / Other</p>
+            <p class="text-2xl font-semibold text-neutral-100">
+                <span data-net-closed-other>{{ $closedOther }}</span>
             </p>
         </div>
 
@@ -58,6 +72,60 @@
                 id="network-chart-{{ $this->getId() }}"
                 data-chart='@json($chartData)'
                 style="width:100%;height:100%"></canvas>
+        </div>
+    </div>
+
+    {{-- Card 3: Connections by IP --}}
+    <div class="rounded-lg border border-neutral-800 px-5 pt-4 pb-3 mt-4">
+        <p class="text-sm font-mono font-semibold text-neutral-200 mb-1">Connections by IP</p>
+        <p class="text-[11px] font-mono text-neutral-500 mb-4">
+            spot hosts with abnormal closed / half-open ratios — potential spam, scan, or stuck client
+        </p>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs font-mono">
+                <thead class="text-[11px] uppercase tracking-widest text-neutral-500 border-b border-neutral-800">
+                    <tr>
+                        <th class="text-left py-2 pr-4">Local IP</th>
+                        <th class="text-right py-2 px-4">Total</th>
+                        <th class="text-right py-2 px-4">Established</th>
+                        <th class="text-right py-2 px-4">Closed</th>
+                        <th class="text-right py-2 px-4">Other</th>
+                        <th class="text-left py-2 pl-4 w-64">State distribution</th>
+                    </tr>
+                </thead>
+                <tbody data-conn-tbody class="text-neutral-200">
+                    @forelse($byIp as $ip)
+                        @php
+                            $total = max(1, $ip['total']);
+                            $pctEst    = round($ip['established'] / $total * 100);
+                            $pctClosed = round($ip['closed']      / $total * 100);
+                            $pctOther  = round($ip['other']       / $total * 100);
+                        @endphp
+                        <tr class="border-b border-neutral-800/50">
+                            <td class="py-3 pr-4">{{ $ip['ip'] }}</td>
+                            <td class="py-3 px-4 text-right">{{ $ip['total'] }}</td>
+                            <td class="py-3 px-4 text-right text-emerald-400">{{ $ip['established'] }}</td>
+                            <td class="py-3 px-4 text-right text-neutral-400">{{ $ip['closed'] }}</td>
+                            <td class="py-3 px-4 text-right text-amber-400">{{ $ip['other'] }}</td>
+                            <td class="py-3 pl-4">
+                                <div class="flex h-1.5 rounded overflow-hidden bg-neutral-900">
+                                    <div class="bg-emerald-400" style="width: {{ $pctEst }}%"></div>
+                                    <div class="bg-neutral-500" style="width: {{ $pctClosed }}%"></div>
+                                    <div class="bg-amber-400"   style="width: {{ $pctOther }}%"></div>
+                                </div>
+                                <div class="flex gap-3 mt-1.5 text-[10px]">
+                                    <span class="text-emerald-400">● {{ $pctEst }}%</span>
+                                    <span class="text-neutral-400">● {{ $pctClosed }}%</span>
+                                    <span class="text-amber-400">● {{ $pctOther }}%</span>
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="6" class="py-4 text-center text-neutral-500">No connection data</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
     </div>
 
@@ -207,7 +275,57 @@
 
     buildChart();
 
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function rebuildConnTable(byIp) {
+        const tbody = getRoot()?.querySelector('[data-conn-tbody]');
+        if (!tbody || !Array.isArray(byIp)) return;
+
+        if (byIp.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-neutral-500">No connection data</td></tr>';
+            return;
+        }
+
+        const html = byIp.map(row => {
+            const total = Math.max(1, row.total);
+            const pctEst    = Math.round(row.established / total * 100);
+            const pctClosed = Math.round(row.closed      / total * 100);
+            const pctOther  = Math.round(row.other       / total * 100);
+            return `
+                <tr class="border-b border-neutral-800/50">
+                    <td class="py-3 pr-4">${escapeHtml(row.ip)}</td>
+                    <td class="py-3 px-4 text-right">${row.total}</td>
+                    <td class="py-3 px-4 text-right text-emerald-400">${row.established}</td>
+                    <td class="py-3 px-4 text-right text-neutral-400">${row.closed}</td>
+                    <td class="py-3 px-4 text-right text-amber-400">${row.other}</td>
+                    <td class="py-3 pl-4">
+                        <div class="flex h-1.5 rounded overflow-hidden bg-neutral-900">
+                            <div class="bg-emerald-400" style="width: ${pctEst}%"></div>
+                            <div class="bg-neutral-500" style="width: ${pctClosed}%"></div>
+                            <div class="bg-amber-400"   style="width: ${pctOther}%"></div>
+                        </div>
+                        <div class="flex gap-3 mt-1.5 text-[10px]">
+                            <span class="text-emerald-400">● ${pctEst}%</span>
+                            <span class="text-neutral-400">● ${pctClosed}%</span>
+                            <span class="text-amber-400">● ${pctOther}%</span>
+                        </div>
+                    </td>
+                </tr>`;
+        }).join('');
+
+        tbody.innerHTML = html;
+    }
+
     function onEvent(e) {
+        if (e.type === 'connections') {
+            setText('[data-net-established]',  e.payload.established);
+            setText('[data-net-closed-other]', e.payload.closed_other);
+            rebuildConnTable(e.payload.by_ip);
+            return;
+        }
+
         if (e.type !== 'network') return;
         if (!isLive()) return;
 
