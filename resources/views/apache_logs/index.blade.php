@@ -1,7 +1,18 @@
 <x-app-layout>
 
-    {{-- Time Range Picker — componentă Livewire, dispatchează timeRangeChanged --}}
-    <livewire:time-range-picker title="Apache Traffic" />
+    
+    <div class="flex items-start gap-3">
+        {{-- Time Range Picker — componentă Livewire, dispatchează timeRangeChanged --}}
+        <div class="flex-1 min-w-0">
+            <livewire:time-range-picker title="Apache Traffic" />
+        </div>
+
+        <button
+            type="button"
+            class="px-3 py-1.5 bg-panel border border-border rounded-md text-xs text-label hover:text-text font-mono transition-colors duration-150 whitespace-nowrap">
+            IP Suspicious
+        </button>
+    </div>
 
     {{-- Peak Traffic Timeline --}}
     <livewire:peak-traffic-timeline />
