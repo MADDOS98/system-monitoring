@@ -59,11 +59,53 @@ class SimulateMetrics extends Command
     private int $stolenSpikeLeft = 0;
     private float $stolenSpikeMag = 0;
 
+    // Connection metrics: profil per IP local
+    private const CONNECTION_IP_PROFILES = [
+        '127.0.0.1' => [
+            'baseConn' => 14,
+            'svcPorts' => [3306, 5432, 6379, 8080, 9000, 11211, 27017],
+            'states'   => ['ESTABLISHED' => 0.55, 'TIME_WAIT' => 0.25, 'CLOSE_WAIT' => 0.05, 'LISTEN' => 0.10, 'CLOSE' => 0.05],
+        ],
+        '127.0.0.53' => [
+            'baseConn' => 2,
+            'svcPorts' => [53],
+            'states'   => ['LISTEN' => 0.7, 'CLOSE' => 0.3],
+        ],
+        '0.0.0.0' => [
+            'baseConn' => 5,
+            'svcPorts' => [22, 80, 443, 8080, 5432, 6379],
+            'states'   => ['LISTEN' => 1.0],
+        ],
+        '::1' => [
+            'baseConn' => 3,
+            'svcPorts' => [6379, 3306, 8080],
+            'states'   => ['ESTABLISHED' => 0.65, 'TIME_WAIT' => 0.3, 'CLOSE_WAIT' => 0.05],
+        ],
+        '::' => [
+            'baseConn' => 4,
+            'svcPorts' => [22, 80, 443, 8080],
+            'states'   => ['LISTEN' => 1.0],
+        ],
+        '192.168.1.10' => [
+            'baseConn' => 10,
+            'svcPorts' => [22, 80, 443],
+            'states'   => ['ESTABLISHED' => 0.45, 'TIME_WAIT' => 0.35, 'CLOSE_WAIT' => 0.10, 'FIN_WAIT2' => 0.05, 'SYN_SENT' => 0.05],
+        ],
+    ];
+
+    // Conexiuni curente per IP (stare persistenta, drift cu inertie)
+    private array $connLevels = [];
+
     public function handle(): int
     {
         // Bias per core: stabilit o data per rulare
         for ($c = 0; $c < self::CPU_CORE_COUNT; $c++) {
             $this->cpuCoreBias[$c] = mt_rand(-8, 12);
+        }
+
+        // Pornesc nivelurile de conexiuni la baseConn
+        foreach (self::CONNECTION_IP_PROFILES as $ip => $profile) {
+            $this->connLevels[$ip] = (float) $profile['baseConn'];
         }
 
         if (!$this->option('loop')) {
@@ -113,6 +155,17 @@ class SimulateMetrics extends Command
             DB::connection('system_metrics')->table('disk_usage_metrics')->insert($diskUsageRow);
         }
 
+        // connection_metrics se inregistreaza o data pe minut (mai multe randuri / IP)
+        $connRows  = [];
+        $connTotal = 0;
+        if ($ts % 60 === 0) {
+            $connRows  = $this->buildConnectionRows($ts, $hour);
+            $connTotal = array_sum(array_column($connRows, 'total_connections'));
+            if (!empty($connRows)) {
+                DB::connection('system_metrics')->table('connection_metrics')->insert($connRows);
+            }
+        }
+
         try {
             MetricCollected::dispatch('ram', $ts, [
                 'total_kb' => $ramRow['total_kb'],
@@ -139,6 +192,16 @@ class SimulateMetrics extends Command
                 MetricCollected::dispatch('disk_usage', $ts, [
                     'total_bytes' => $diskUsageRow['total_bytes'],
                     'used_bytes'  => $diskUsageRow['used_bytes'],
+                ]);
+            }
+
+            if (!empty($connRows)) {
+                $breakdown = $this->summarizeConnections($connRows);
+                MetricCollected::dispatch('connections', $ts, [
+                    'total'        => $connTotal,
+                    'established'  => $breakdown['established'],
+                    'closed_other' => $breakdown['closedOther'],
+                    'by_ip'        => $breakdown['byIp'],
                 ]);
             }
         } catch (\Throwable $e) {
@@ -369,5 +432,141 @@ class SimulateMetrics extends Command
             'per_core_usage' => json_encode($perCore),
             'stolen_usage'   => round($stolenUsage, 2),
         ];
+    }
+
+    /**
+     * Genereaza cate un rand pentru fiecare IP local activ.
+     * Numarul de conexiuni driftuieste catre baseConn * hourFactor cu inertie.
+     */
+    private function buildConnectionRows(int $ts, int $hour): array
+    {
+        $hourFactor = match (true) {
+            $hour >= 0  && $hour <= 5  => 0.30,
+            $hour >= 6  && $hour <= 9  => 0.70,
+            $hour >= 10 && $hour <= 18 => 1.25,
+            default                    => 0.65,
+        };
+
+        $rows = [];
+
+        foreach (self::CONNECTION_IP_PROFILES as $ip => $profile) {
+            $target = $profile['baseConn'] * $hourFactor;
+
+            // Drift catre target + zgomot
+            $this->connLevels[$ip] += ($target - $this->connLevels[$ip]) * 0.25;
+            $this->connLevels[$ip] += mt_rand(-150, 200) / 100;
+
+            $total = max(0, (int) round($this->connLevels[$ip]));
+
+            // Spike ocazional (request burst): ~0.5% sansa
+            if (mt_rand(1, 200) === 1) {
+                $total += mt_rand(8, 25);
+            }
+
+            if ($total === 0) {
+                continue;
+            }
+
+            $rows[] = [
+                'collected_at'      => $ts,
+                'local_ip'          => $ip,
+                'total_connections' => $total,
+                'port_counts'       => json_encode($this->distributeConnPorts($total, $profile['svcPorts'])),
+                'state_counts'      => json_encode($this->distributeConnStates($total, $profile['states'])),
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function distributeConnPorts(int $total, array $svcPorts): array
+    {
+        $counts = [];
+        for ($i = 0; $i < $total; $i++) {
+            if (!empty($svcPorts) && mt_rand(1, 100) <= 65) {
+                $port = $svcPorts[array_rand($svcPorts)];
+            } else {
+                $port = mt_rand(32768, 65535);
+            }
+            $key = (string) $port;
+            $counts[$key] = ($counts[$key] ?? 0) + 1;
+        }
+        return $counts;
+    }
+
+    /**
+     * Agrega randurile de conexiuni intr-un breakdown:
+     *   established / closedOther totale + lista per IP cu split-ul est/closed/other.
+     */
+    private function summarizeConnections(array $rows): array
+    {
+        $closedStates = ['CLOSE', 'CLOSE_WAIT', 'TIME_WAIT', 'FIN_WAIT1', 'FIN_WAIT2', 'LAST_ACK', 'CLOSING'];
+
+        $totalEst    = 0;
+        $totalClosed = 0;
+        $totalOther  = 0;
+        $byIp        = [];
+
+        foreach ($rows as $row) {
+            $states = json_decode($row['state_counts'], true) ?? [];
+            $est = $closed = $other = 0;
+            foreach ($states as $state => $count) {
+                if ($state === 'ESTABLISHED') {
+                    $est += $count;
+                } elseif (in_array($state, $closedStates, true)) {
+                    $closed += $count;
+                } else {
+                    $other += $count;
+                }
+            }
+            $totalEst    += $est;
+            $totalClosed += $closed;
+            $totalOther  += $other;
+            $byIp[] = [
+                'ip'          => $row['local_ip'],
+                'total'       => $row['total_connections'],
+                'established' => $est,
+                'closed'      => $closed,
+                'other'       => $other,
+            ];
+        }
+
+        usort($byIp, fn($a, $b) => $b['total'] <=> $a['total']);
+
+        return [
+            'established' => $totalEst,
+            'closedOther' => $totalClosed + $totalOther,
+            'byIp'        => $byIp,
+        ];
+    }
+
+    private function distributeConnStates(int $total, array $weights): array
+    {
+        if ($total === 0) {
+            return [];
+        }
+
+        $result    = [];
+        $remaining = $total;
+        $states    = array_keys($weights);
+        $lastIdx   = count($states) - 1;
+
+        foreach ($states as $idx => $state) {
+            if ($idx === $lastIdx) {
+                if ($remaining > 0) {
+                    $result[$state] = $remaining;
+                }
+                break;
+            }
+
+            $count = (int) round($total * $weights[$state]);
+            $count = min($count, $remaining);
+            if ($count > 0) {
+                $result[$state] = $count;
+                $remaining -= $count;
+            }
+        }
+
+        return $result;
     }
 }

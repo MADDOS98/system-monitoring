@@ -27,5 +27,6 @@ class DatabaseSeeder extends Seeder
         $this->call(NetworkMetricsSeeder::class);
         $this->call(DiskMetricsSeeder::class);
         $this->call(CpuMetricsSeeder::class);
+        $this->call(ConnectionMetricsSeeder::class);
     }
 }
