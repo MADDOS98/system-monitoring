@@ -10,7 +10,7 @@
         <button
             type="button"
             class="px-3 py-1.5 bg-panel border border-border rounded-md text-xs text-label hover:text-text font-mono transition-colors duration-150 whitespace-nowrap">
-            IP Suspicious
+            IP Reputations
         </button>
     </div>
 
