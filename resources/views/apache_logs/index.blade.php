@@ -9,10 +9,14 @@
 
         <button
             type="button"
+            onclick="Livewire.dispatch('open-host-reputations')"
             class="px-3 py-1.5 bg-panel border border-border rounded-md text-xs text-label hover:text-text font-mono transition-colors duration-150 whitespace-nowrap">
             IP Reputations
         </button>
     </div>
+
+    {{-- Modal IP Reputations (mounted gol, devine vizibil cand butonul de mai sus dispatch-uieaza eventul) --}}
+    <livewire:host-reputations />
 
     {{-- Peak Traffic Timeline --}}
     <livewire:peak-traffic-timeline />
