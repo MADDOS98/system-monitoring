@@ -26,29 +26,26 @@ class StatusTable extends Component
 
     public function render()
     {
+        // Grupare directa pe bucket-ul de status (2xx/3xx/4xx/5xx/other) — fara dublu-group in PHP.
         $byStatus = ApacheLog::query()
             ->when($this->from, fn($q) => $q->where('log_time', '>=', $this->from))
             ->when($this->to,   fn($q) => $q->where('log_time', '<=', $this->to))
             ->selectRaw('
-                status,
-                COUNT(*) as total,
                 CASE
                     WHEN status BETWEEN 200 AND 299 THEN "2xx"
                     WHEN status BETWEEN 300 AND 399 THEN "3xx"
                     WHEN status BETWEEN 400 AND 499 THEN "4xx"
                     WHEN status BETWEEN 500 AND 599 THEN "5xx"
                     ELSE "other"
-                END as `group`
+                END as `group`,
+                COUNT(*) as total
             ')
-            ->groupBy('status', 'group')
-            ->orderBy('status')
-            ->get()
             ->groupBy('group')
-            ->map(fn($rows, $group) => (object) [
-                'group' => $group,
-                'total' => $rows->sum('total'),
-            ])
-            ->values();
+            ->get()
+            ->map(fn($row) => (object) [
+                'group' => $row->group,
+                'total' => $row->total,
+            ]);
 
         $totalStat = $byStatus->sum('total') ?: 1;
 
