@@ -1,4 +1,14 @@
 <div wire:key="top-ips-table"
+    x-data="{
+        selectedIps: [],
+        toggle(ip) {
+            if (this.selectedIps.includes(ip)) {
+                this.selectedIps = this.selectedIps.filter(i => i !== ip);
+            } else {
+                this.selectedIps.push(ip);
+            }
+        }
+    }"
     class="rounded-lg border border-border overflow-hidden flex flex-col"
     style="height: calc(12 * 53px)">
 
@@ -37,29 +47,31 @@
     <div class="overflow-y-auto flex-1 divide-y divide-[#2a2a2a]">
         @forelse ($topIps as $ip)
         @php
-        $selected = in_array($ip->ip, $this->selectedIps);
-        $showTag = in_array($ip->tag ?? '', ['TRUSTED', 'SUSPECT']);
-        $tagColor = match($ip->tag ?? '') {
-        'TRUSTED' => 'bg-green-900 text-green-400',
-        'SUSPECT' => 'bg-red-900 text-red-400',
+        $showTag  = $ip->status !== null;
+        $tagColor = match($ip->status) {
+        1 => 'bg-green-900 text-green-400',
+        2 => 'bg-yellow-950 text-yellow-400',
+        3 => 'bg-red-900 text-red-400',
         default => '',
         };
         $s2 = $ip->s2xx; $s3 = $ip->s3xx; $s4 = $ip->s4xx; $s5 = $ip->s5xx;
         $p2 = $s2; $p3 = $p2 + $s3; $p4 = $p3 + $s4; $p5 = $p4 + $s5;
         $gradient = "linear-gradient(to right, #22c55e 0% {$p2}%, #3b82f6 {$p2}% {$p3}%, #eab308 {$p3}% {$p4}%, #ef4444 {$p4}% {$p5}%)";
-        $rowBg = $selected
-        ? match($ip->tag ?? '') {
-        'TRUSTED' => 'bg-green-500/15',
-        'SUSPECT' => 'bg-red-500/15',
+        $rowBgSelected = match($ip->status) {
+        1 => 'bg-green-500/15',
+        2 => 'bg-yellow-500/15',
+        3 => 'bg-red-500/15',
         default => 'bg-[#111111]',
-        }
-        : match($ip->tag ?? '') {
-        'TRUSTED' => 'bg-green-500/5',
-        'SUSPECT' => 'bg-red-500/5',
+        };
+        $rowBgIdle = match($ip->status) {
+        1 => 'bg-green-500/5',
+        2 => 'bg-yellow-500/5',
+        3 => 'bg-red-500/5',
         default => 'bg-[#111111]',
         };
         @endphp
-        <div class="relative grid grid-cols-12 px-4 py-2.5 {{ $rowBg }} transition-colors duration-100 items-center group">
+        <div class="relative grid grid-cols-12 px-4 py-2.5 transition-colors duration-100 items-center group"
+             :class="selectedIps.includes('{{ $ip->ip }}') ? '{{ $rowBgSelected }}' : '{{ $rowBgIdle }}'">
             {{-- Overlay transparent care intensifica bg-ul existent la hover --}}
             <div class="absolute inset-0 bg-white opacity-0 group-hover:opacity-[0.04] transition-opacity duration-100 pointer-events-none"></div>
 
@@ -71,8 +83,8 @@
                     <span class="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded {{ $tagColor }}">{{ $ip->tag }}</span>
                     @endif
                 </div>
-                @if($showTag)
-                <div class="text-[10px] text-[#6b7280] font-mono mt-0.5 truncate">{{ $ip->hostname }}</div>
+                @if($showTag && $ip->host)
+                <div class="text-[10px] text-[#6b7280] font-mono mt-0.5 truncate">{{ $ip->host }}</div>
                 @endif
             </div>
 
@@ -105,22 +117,20 @@
             {{-- Select button --}}
             <div class="col-span-1 flex justify-end">
                 <button
-                    wire:click="toggleIp('{{ $ip->ip }}')"
-                    class="w-6 h-6 rounded border flex items-center justify-center transition-colors duration-150
-                            {{ $selected
-                                ? 'border-accent bg-accent/20 text-accent'
-                                : 'border-[#3a3a3a] bg-[#1a1a1a] text-[#6b7280] hover:border-accent hover:text-accent' }}">
-                    @if($selected)
-                    {{-- Checkmark --}}
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    type="button"
+                    @click="toggle('{{ $ip->ip }}')"
+                    class="w-6 h-6 rounded border flex items-center justify-center transition-colors duration-150"
+                    :class="selectedIps.includes('{{ $ip->ip }}')
+                        ? 'border-accent bg-accent/20 text-accent'
+                        : 'border-[#3a3a3a] bg-[#1a1a1a] text-[#6b7280] hover:border-accent hover:text-accent'">
+                    {{-- Checkmark when selected --}}
+                    <svg x-show="selectedIps.includes('{{ $ip->ip }}')" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                         <path d="M20 6L9 17l-5-5" />
                     </svg>
-                    @else
-                    {{-- Plus --}}
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    {{-- Plus when not --}}
+                    <svg x-show="!selectedIps.includes('{{ $ip->ip }}')" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                         <path d="M12 5v14M5 12h14" />
                     </svg>
-                    @endif
                 </button>
             </div>
 
