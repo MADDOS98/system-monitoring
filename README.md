@@ -1,10 +1,13 @@
 composer install
-@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
-@php artisan key:generate
-@php artisan migrate --force
-@php artisan migrate --force --path=database/migrations/system_metrics --database=system_metrics
+php -r "file_exists('.env') || copy('.env.example', '.env');"
+php artisan key:generate
+php artisan migrate --force
+php artisan migrate --force --path=database/migrations/system_metrics --database=system_metrics
+php artisan db:seed
 npm install
 npm run build
+
+Terminaluri diferite:
 php artisan reverb:start
 php artisan serve
 
