@@ -14,8 +14,12 @@ Route::get('/dashboard', function () {
 
 Route::get('/apache-logs', [ApacheLogController::class, 'index'])->middleware(['auth', 'verified'])->name('apache-logs');
 
-Route::get('/metrics', function () {
-    return view('metrics.index');
+Route::get('/metrics', function (\Illuminate\Http\Request $request) {
+    $tab = $request->query('tab', 'cpu');
+    if (!in_array($tab, ['cpu', 'ram', 'network', 'disk'], true)) {
+        $tab = 'cpu';
+    }
+    return view('metrics.index', compact('tab'));
 })->middleware(['auth', 'verified'])->name('metrics');
 
 Route::middleware('auth')->group(function () {
