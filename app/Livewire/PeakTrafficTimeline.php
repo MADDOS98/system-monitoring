@@ -10,16 +10,37 @@ use Carbon\Carbon;
 class PeakTrafficTimeline extends Component
 {
     public ?string $toDate = null;
+    public ?int    $from   = null;
+    public ?int    $to     = null;
 
     public function mount(): void
     {
         $this->toDate = Carbon::now()->format('Y-m-d');
+        $this->from   = Carbon::now()->subMinutes(5)->timestamp;
+        $this->to     = Carbon::now()->timestamp;
     }
 
     #[On('setTimeRange')]
     public function setTimeRange(string $from, string $to): void
     {
+        $this->from   = (int) $from;
+        $this->to     = (int) $to;
         $this->toDate = Carbon::createFromTimestamp((int) $to)->format('Y-m-d');
+    }
+
+    private function resolveBucketSeconds(int $diffSeconds): int
+    {
+        $minutes = $diffSeconds / 60;
+
+        return match (true) {
+            $minutes <  20     => 1,
+            $minutes <  100    => 5,
+            $minutes <  720    => 60,
+            $minutes <  4320   => 300,
+            $minutes <  20160  => 900,
+            $minutes <  86400  => 3600,
+            default            => 86400,
+        };
     }
 
     public function render()
@@ -89,6 +110,8 @@ class PeakTrafficTimeline extends Component
             }
         }
 
-        return view('livewire.peak-traffic-timeline', compact('bins', 'max', 'day', 'levels'));
+        $bucketSeconds = $this->resolveBucketSeconds(max(1, ($this->to ?? 0) - ($this->from ?? 0)));
+
+        return view('livewire.peak-traffic-timeline', compact('bins', 'max', 'day', 'levels', 'bucketSeconds'));
     }
 }

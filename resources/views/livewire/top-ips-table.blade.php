@@ -9,6 +9,7 @@
             }
         }
     }"
+    data-bucket-seconds="{{ $bucketSeconds }}"
     class="rounded-lg border border-border overflow-hidden flex flex-col"
     style="height: calc(12 * 53px)">
 
@@ -141,5 +142,31 @@
         </div>
         @endforelse
     </div>
+
+@script
+<script>
+(function () {
+    const componentId = '{{ $this->getId() }}';
+    function getRoot() { return document.querySelector('[wire\\:id="' + componentId + '"]'); }
+    function isLive() {
+        const picker = document.querySelector('[data-live]');
+        return picker?.dataset.live === '1';
+    }
+
+    let pendingRefresh = false;
+    function scheduleRefresh() {
+        if (!isLive()) return;
+        if (pendingRefresh) return;
+        pendingRefresh = true;
+        const ms = parseInt(getRoot()?.dataset.bucketSeconds || '1', 10) * 1000;
+        setTimeout(() => { $wire.$refresh(); pendingRefresh = false; }, ms);
+    }
+
+    if (window.Echo) {
+        window.Echo.channel('apache-logs').listen('.ApacheLogCreated', scheduleRefresh);
+    }
+})();
+</script>
+@endscript
 
 </div>

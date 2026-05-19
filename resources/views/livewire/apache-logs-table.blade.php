@@ -1,4 +1,4 @@
-<div wire:key="apache-logs-table">
+<div wire:key="apache-logs-table" data-bucket-seconds="{{ $bucketSeconds }}">
 
     {{-- Toolbar cu search — ÎNĂUNTRUL componentei Livewire ca wire:model să funcționeze --}}
     <div class="flex items-center justify-between px-4 py-2.5 bg-sidebar border-b border-border"
@@ -216,5 +216,31 @@
 
     </div>
     @endif
+
+@script
+<script>
+(function () {
+    const componentId = '{{ $this->getId() }}';
+    function getRoot() { return document.querySelector('[wire\\:id="' + componentId + '"]'); }
+    function isLive() {
+        const picker = document.querySelector('[data-live]');
+        return picker?.dataset.live === '1';
+    }
+
+    let pendingRefresh = false;
+    function scheduleRefresh() {
+        if (!isLive()) return;
+        if (pendingRefresh) return;
+        pendingRefresh = true;
+        const ms = parseInt(getRoot()?.dataset.bucketSeconds || '1', 10) * 1000;
+        setTimeout(() => { $wire.$refresh(); pendingRefresh = false; }, ms);
+    }
+
+    if (window.Echo) {
+        window.Echo.channel('apache-logs').listen('.ApacheLogCreated', scheduleRefresh);
+    }
+})();
+</script>
+@endscript
 
 </div>

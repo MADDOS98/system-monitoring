@@ -1,5 +1,6 @@
 <div wire:key="peak-traffic-timeline"
      x-data="{ selected: null, bins: @js(array_values($bins)) }"
+     data-bucket-seconds="{{ $bucketSeconds }}"
      class="w-full rounded-lg border border-[#2a2a2a] mb-5 px-5 pt-4 pb-3">
 
     {{-- Header --}}
@@ -69,3 +70,29 @@
     </div>
 
 </div>
+
+@script
+<script>
+(function () {
+    const componentId = '{{ $this->getId() }}';
+    function getRoot() { return document.querySelector('[wire\\:id="' + componentId + '"]'); }
+    function isLive() {
+        const picker = document.querySelector('[data-live]');
+        return picker?.dataset.live === '1';
+    }
+
+    let pendingRefresh = false;
+    function scheduleRefresh() {
+        if (!isLive()) return;
+        if (pendingRefresh) return;
+        pendingRefresh = true;
+        const ms = parseInt(getRoot()?.dataset.bucketSeconds || '1', 10) * 1000;
+        setTimeout(() => { $wire.$refresh(); pendingRefresh = false; }, ms);
+    }
+
+    if (window.Echo) {
+        window.Echo.channel('apache-logs').listen('.ApacheLogCreated', scheduleRefresh);
+    }
+})();
+</script>
+@endscript

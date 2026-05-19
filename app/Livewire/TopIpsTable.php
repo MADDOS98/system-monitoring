@@ -93,6 +93,23 @@ class TopIpsTable extends Component
                 default       => true,
             });
 
-        return view('livewire.top-ips-table', compact('topIps'));
+        $bucketSeconds = $this->resolveBucketSeconds(max(1, ($this->to ?? 0) - ($this->from ?? 0)));
+
+        return view('livewire.top-ips-table', compact('topIps', 'bucketSeconds'));
+    }
+
+    private function resolveBucketSeconds(int $diffSeconds): int
+    {
+        $minutes = $diffSeconds / 60;
+
+        return match (true) {
+            $minutes <  20     => 1,
+            $minutes <  100    => 5,
+            $minutes <  720    => 60,
+            $minutes <  4320   => 300,
+            $minutes <  20160  => 900,
+            $minutes <  86400  => 3600,
+            default            => 86400,
+        };
     }
 }
