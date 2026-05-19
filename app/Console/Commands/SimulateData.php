@@ -2,14 +2,19 @@
 
 namespace App\Console\Commands;
 
-use App\Events\MetricCollected;
+use App\Models\ApacheLog;
+use App\Models\ConnectionMetric;
+use App\Models\CpuMetric;
+use App\Models\DiskIoMetric;
+use App\Models\DiskUsageMetric;
+use App\Models\NetworkMetric;
+use App\Models\RamMetric;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 
-class SimulateMetrics extends Command
+class SimulateData extends Command
 {
-    protected $signature   = 'metrics:simulate {--loop : ruleaza continuu, generand 1 punct/sec/tabel}';
-    protected $description = 'Genereaza date fake pentru ram_metrics si network_metrics. Cu --loop simuleaza colectare in timp real.';
+    protected $signature   = 'data:simulate {--loop : ruleaza continuu, generand 1 punct/sec/tabel}';
+    protected $description = 'Genereaza date fake in toate tabelele de monitorizare (metrics + apache_logs). Cu --loop simuleaza colectare in timp real.';
 
     // RAM: state persistent pentru a face miscarea "lina" (drift + zgomot)
     private float $ramPct = 0.45;
@@ -96,6 +101,30 @@ class SimulateMetrics extends Command
     // Conexiuni curente per IP (stare persistenta, drift cu inertie)
     private array $connLevels = [];
 
+    // Apache logs: pool de IP-uri "regulate" + altele random
+    private const APACHE_URIS = [
+        '/', '/login', '/register', '/dashboard',
+        '/api/users', '/api/orders', '/api/products', '/api/auth/login',
+        '/products', '/products/1', '/products/2',
+        '/search', '/checkout', '/cart', '/about', '/contact',
+        '/static/main.css', '/static/app.js', '/favicon.ico',
+    ];
+    private const APACHE_USER_AGENTS = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Firefox/120',
+        'Mozilla/5.0 (Linux; Android 10) Mobile Safari/537.36',
+        'curl/7.85.0',
+        'PostmanRuntime/7.32.0',
+        'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+    ];
+    private const APACHE_REFERERS = [
+        '-', '-', '-',                       // ponderat catre "fara referer"
+        'https://google.com/search?q=test',
+        'https://github.com/explore',
+        'https://facebook.com',
+    ];
+    private array $apacheIpPool = [];
+
     public function handle(): int
     {
         // Bias per core: stabilit o data per rulare
@@ -108,9 +137,14 @@ class SimulateMetrics extends Command
             $this->connLevels[$ip] = (float) $profile['baseConn'];
         }
 
+        // Pool de ~25 IP-uri "frecvente" (cei care apar des in logs)
+        for ($i = 0; $i < 25; $i++) {
+            $this->apacheIpPool[] = mt_rand(1, 254) . '.' . mt_rand(0, 255) . '.' . mt_rand(0, 255) . '.' . mt_rand(1, 254);
+        }
+
         if (!$this->option('loop')) {
             $this->insertTick(time());
-            $this->info('Inserted 1 row in each metrics table.');
+            $this->info('Inserted 1 tick: metrics + apache log.');
             return self::SUCCESS;
         }
 
@@ -138,76 +172,29 @@ class SimulateMetrics extends Command
     {
         $hour = (int) date('G', $ts);
 
-        $ramRow    = $this->buildRamRow($ts, $hour);
-        $netRow    = $this->buildNetworkRow($ts, $hour);
-        $diskIoRow = $this->buildDiskIoRow($ts, $hour);
-        $cpuRow    = $this->buildCpuRow($ts, $hour);
-
-        DB::connection('system_metrics')->table('ram_metrics')->insert($ramRow);
-        DB::connection('system_metrics')->table('network_metrics')->insert($netRow);
-        DB::connection('system_metrics')->table('disk_io_metrics')->insert($diskIoRow);
-        DB::connection('system_metrics')->table('cpu_metrics')->insert($cpuRow);
+        // Insert prin Eloquent — observerele inregistrate in AppServiceProvider
+        // declanseaza broadcasturile MetricCollected automat. Niciun dispatch
+        // manual aici, ca sa fie source-agnostic.
+        RamMetric::create($this->buildRamRow($ts, $hour));
+        NetworkMetric::create($this->buildNetworkRow($ts, $hour));
+        DiskIoMetric::create($this->buildDiskIoRow($ts, $hour));
+        CpuMetric::create($this->buildCpuRow($ts, $hour));
 
         // disk_usage se inregistreaza o data pe minut
-        $diskUsageRow = null;
         if ($ts % 60 === 0) {
-            $diskUsageRow = $this->buildDiskUsageRow($ts);
-            DB::connection('system_metrics')->table('disk_usage_metrics')->insert($diskUsageRow);
+            DiskUsageMetric::create($this->buildDiskUsageRow($ts));
         }
 
-        // connection_metrics se inregistreaza o data pe minut (mai multe randuri / IP)
-        $connRows  = [];
-        $connTotal = 0;
+        // connection_metrics se inregistreaza o data pe minut (mai multe randuri / IP).
+        // Observer-ul fire-uieste 'connections' agregat dupa fiecare row creat.
         if ($ts % 60 === 0) {
-            $connRows  = $this->buildConnectionRows($ts, $hour);
-            $connTotal = array_sum(array_column($connRows, 'total_connections'));
-            if (!empty($connRows)) {
-                DB::connection('system_metrics')->table('connection_metrics')->insert($connRows);
+            foreach ($this->buildConnectionRows($ts, $hour) as $row) {
+                ConnectionMetric::create($row);
             }
         }
 
-        try {
-            MetricCollected::dispatch('ram', $ts, [
-                'total_kb' => $ramRow['total_kb'],
-                'used_kb'  => $ramRow['used_kb'],
-            ]);
-
-            MetricCollected::dispatch('network', $ts, [
-                'rx_bytes' => $netRow['rx_bytes'],
-                'tx_bytes' => $netRow['tx_bytes'],
-            ]);
-
-            MetricCollected::dispatch('disk_io', $ts, [
-                'read_bytes'  => $diskIoRow['read_bytes'],
-                'write_bytes' => $diskIoRow['write_bytes'],
-            ]);
-
-            MetricCollected::dispatch('cpu', $ts, [
-                'total_usage'    => $cpuRow['total_usage'],
-                'per_core_usage' => json_decode($cpuRow['per_core_usage'], true),
-                'stolen_usage'   => $cpuRow['stolen_usage'],
-            ]);
-
-            if ($diskUsageRow !== null) {
-                MetricCollected::dispatch('disk_usage', $ts, [
-                    'total_bytes' => $diskUsageRow['total_bytes'],
-                    'used_bytes'  => $diskUsageRow['used_bytes'],
-                ]);
-            }
-
-            if (!empty($connRows)) {
-                $breakdown = $this->summarizeConnections($connRows);
-                MetricCollected::dispatch('connections', $ts, [
-                    'total'        => $connTotal,
-                    'established'  => $breakdown['established'],
-                    'closed_other' => $breakdown['closedOther'],
-                    'by_ip'        => $breakdown['byIp'],
-                ]);
-            }
-        } catch (\Throwable $e) {
-            // Reverb e oprit sau inaccesibil — continuam fara broadcast
-            $this->warn('Broadcast failed: ' . $e->getMessage());
-        }
+        // apache_logs: 1 row/sec. Observer-ul fire-uieste 'ApacheLogCreated'.
+        ApacheLog::create($this->buildApacheLogRow($ts));
     }
 
     private function buildRamRow(int $ts, int $hour): array
@@ -429,7 +416,7 @@ class SimulateMetrics extends Command
         return [
             'collected_at'   => $ts,
             'total_usage'    => round($this->cpuTotalUsage, 2),
-            'per_core_usage' => json_encode($perCore),
+            'per_core_usage' => $perCore, // array — cast 'array' din model il va encoda la save
             'stolen_usage'   => round($stolenUsage, 2),
         ];
     }
@@ -471,8 +458,8 @@ class SimulateMetrics extends Command
                 'collected_at'      => $ts,
                 'local_ip'          => $ip,
                 'total_connections' => $total,
-                'port_counts'       => json_encode($this->distributeConnPorts($total, $profile['svcPorts'])),
-                'state_counts'      => json_encode($this->distributeConnStates($total, $profile['states'])),
+                'port_counts'       => $this->distributeConnPorts($total, $profile['svcPorts']), // cast 'array' din model
+                'state_counts'      => $this->distributeConnStates($total, $profile['states']),
             ];
         }
 
@@ -492,52 +479,6 @@ class SimulateMetrics extends Command
             $counts[$key] = ($counts[$key] ?? 0) + 1;
         }
         return $counts;
-    }
-
-    /**
-     * Agrega randurile de conexiuni intr-un breakdown:
-     *   established / closedOther totale + lista per IP cu split-ul est/closed/other.
-     */
-    private function summarizeConnections(array $rows): array
-    {
-        $closedStates = ['CLOSE', 'CLOSE_WAIT', 'TIME_WAIT', 'FIN_WAIT1', 'FIN_WAIT2', 'LAST_ACK', 'CLOSING'];
-
-        $totalEst    = 0;
-        $totalClosed = 0;
-        $totalOther  = 0;
-        $byIp        = [];
-
-        foreach ($rows as $row) {
-            $states = json_decode($row['state_counts'], true) ?? [];
-            $est = $closed = $other = 0;
-            foreach ($states as $state => $count) {
-                if ($state === 'ESTABLISHED') {
-                    $est += $count;
-                } elseif (in_array($state, $closedStates, true)) {
-                    $closed += $count;
-                } else {
-                    $other += $count;
-                }
-            }
-            $totalEst    += $est;
-            $totalClosed += $closed;
-            $totalOther  += $other;
-            $byIp[] = [
-                'ip'          => $row['local_ip'],
-                'total'       => $row['total_connections'],
-                'established' => $est,
-                'closed'      => $closed,
-                'other'       => $other,
-            ];
-        }
-
-        usort($byIp, fn($a, $b) => $b['total'] <=> $a['total']);
-
-        return [
-            'established' => $totalEst,
-            'closedOther' => $totalClosed + $totalOther,
-            'byIp'        => $byIp,
-        ];
     }
 
     private function distributeConnStates(int $total, array $weights): array
@@ -568,5 +509,82 @@ class SimulateMetrics extends Command
         }
 
         return $result;
+    }
+
+    /**
+     * Genereaza un rand de apache log realist:
+     *  - 80% IP din pool-ul de "regulars", 20% IP random
+     *  - Status weighted: 200 dominant, 4xx/5xx ocazional
+     *  - Method weighted: GET dominant
+     *  - Bytes corelat cu status
+     */
+    private function buildApacheLogRow(int $ts): array
+    {
+        $ip = mt_rand(1, 100) <= 80
+            ? $this->apacheIpPool[array_rand($this->apacheIpPool)]
+            : mt_rand(1, 254) . '.' . mt_rand(0, 255) . '.' . mt_rand(0, 255) . '.' . mt_rand(1, 254);
+
+        $method = $this->weightedPick([
+            'GET'    => 75,
+            'POST'   => 15,
+            'PUT'    =>  4,
+            'DELETE' =>  3,
+            'HEAD'   =>  3,
+        ]);
+
+        $status = $this->weightedPick([
+            200 => 65,
+            201 =>  4,
+            204 =>  3,
+            301 =>  3,
+            302 =>  4,
+            304 =>  4,
+            400 =>  3,
+            401 =>  4,
+            403 =>  3,
+            404 =>  5,
+            500 =>  1,
+            502 =>  1,
+        ]);
+
+        // Bytes corelat cu status: success-ul are payload mai mare
+        $bytes = match (true) {
+            $status >= 500              => mt_rand(150, 800),
+            $status >= 400              => mt_rand(200, 1_500),
+            $status === 304             => 0,
+            $status >= 300              => mt_rand(0, 500),
+            default                     => mt_rand(500, 50_000),
+        };
+
+        return [
+            'log_time'    => $ts,
+            'remote_host' => $ip,
+            'ident'       => '-',
+            'user'        => '-',
+            'method'      => $method,
+            'uri'         => self::APACHE_URIS[array_rand(self::APACHE_URIS)],
+            'protocol'    => mt_rand(1, 10) <= 7 ? 'HTTP/1.1' : 'HTTP/2',
+            'status'      => $status,
+            'bytes_sent'  => $bytes,
+            'referer'     => self::APACHE_REFERERS[array_rand(self::APACHE_REFERERS)],
+            'user_agent'  => self::APACHE_USER_AGENTS[array_rand(self::APACHE_USER_AGENTS)],
+        ];
+    }
+
+    /**
+     * Pick weighted dintr-un dictionar [key => weight].
+     */
+    private function weightedPick(array $weights)
+    {
+        $total = array_sum($weights);
+        $r = mt_rand(1, $total);
+        $acc = 0;
+        foreach ($weights as $key => $w) {
+            $acc += $w;
+            if ($r <= $acc) {
+                return $key;
+            }
+        }
+        return array_key_first($weights);
     }
 }
