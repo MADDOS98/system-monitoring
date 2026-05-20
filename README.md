@@ -13,6 +13,9 @@
 ### Pornire:
 - php artisan serve
 
+### Testare date in timp real
+- php artisan data:simulate --loop
+
 Realtime-ul foloseste HTTP polling adaptiv (intervalul = bucket-ul ferestrei de timp curente,
 de la 1s la 1 zi). Nu mai e nevoie de reverb / websocket server separat.
 
