@@ -9,9 +9,10 @@ use Carbon\Carbon;
 
 class PeakTrafficTimeline extends Component
 {
-    public ?string $toDate = null;
-    public ?int    $from   = null;
-    public ?int    $to     = null;
+    public ?string $toDate   = null;
+    public ?int    $from     = null;
+    public ?int    $to       = null;
+    public ?int    $selected = null; // ora selectata (0-23)
 
     public function mount(): void
     {
@@ -23,9 +24,23 @@ class PeakTrafficTimeline extends Component
     #[On('setTimeRange')]
     public function setTimeRange(string $from, string $to): void
     {
-        $this->from   = (int) $from;
-        $this->to     = (int) $to;
-        $this->toDate = Carbon::createFromTimestamp((int) $to)->format('Y-m-d');
+        $this->from     = (int) $from;
+        $this->to       = (int) $to;
+        $this->toDate   = Carbon::createFromTimestamp((int) $to)->format('Y-m-d');
+        $this->selected = null;
+    }
+
+    public function toggleHour(int $hour): void
+    {
+        $this->selected = $this->selected === $hour ? null : $hour;
+    }
+
+    /**
+     * No-op — apelat de listener-ul global din pagina apache_logs pentru a forta re-render.
+     */
+    #[On('refresh-apache-logs')]
+    public function tickRefresh(): void
+    {
     }
 
     private function resolveBucketSeconds(int $diffSeconds): int
