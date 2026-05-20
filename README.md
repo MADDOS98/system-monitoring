@@ -10,9 +10,11 @@
 - npm install
 - npm run build
 
-### Terminaluri diferite:
-- php artisan reverb:start
+### Pornire:
 - php artisan serve
+
+Realtime-ul foloseste HTTP polling adaptiv (intervalul = bucket-ul ferestrei de timp curente,
+de la 1s la 1 zi). Nu mai e nevoie de reverb / websocket server separat.
 
 
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>

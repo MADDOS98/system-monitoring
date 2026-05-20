@@ -1,7 +1,9 @@
 <div
     wire:key="network-metrics"
     data-bucket-seconds="{{ $bucketSeconds }}"
-    data-label-format="{{ $labelFormat }}">
+    data-label-format="{{ $labelFormat }}"
+    data-from-ts="{{ $this->fromTs }}"
+    data-to-ts="{{ $this->toTs }}">
 
     @php
         $rxMbps = round($rxBytes * 8 / 60 / 1_000_000, 2);
@@ -136,37 +138,31 @@
 (function () {
     const id          = 'network-chart-{{ $this->getId() }}';
     const componentId = '{{ $this->getId() }}';
-    let chart   = null;
-    let pending = null; // { start, rxSum, rxCount, txSum, txCount }
+    const PRESET_MINUTES = { '5m': 5, '1h': 60, '24h': 1440 };
+    let chart  = null;
+    let poller = null;
 
-    function pad(n) { return String(n).padStart(2, '0'); }
+    function getRoot() { return document.querySelector('[wire\\:id="' + componentId + '"]'); }
 
-    function getRoot() {
-        return document.querySelector('[wire\\:id="' + componentId + '"]');
+    function getBucketMs() {
+        const sec = parseInt(getRoot()?.dataset.bucketSeconds || '1', 10);
+        return Math.max(1, sec) * 1000;
     }
 
-    function getConfig() {
-        const el = getRoot();
-        return {
-            bucketSeconds: parseInt(el?.dataset.bucketSeconds || '0', 10),
-            labelFormat:   el?.dataset.labelFormat || 'H:i:s',
-        };
-    }
-
-    function formatLabel(ts, fmt) {
-        const d = new Date(ts * 1000);
-        switch (fmt) {
-            case 'H:i:s':   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-            case 'H:i':     return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-            case 'M j':     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            case 'M j H:i': return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
-            default:        return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-        }
-    }
-
-    function isLive() {
+    function getTimeRange() {
         const picker = document.querySelector('[data-live]');
-        return picker?.dataset.live === '1';
+        const live   = picker?.dataset.live === '1';
+        const preset = picker?.dataset.preset;
+        if (live && PRESET_MINUTES[preset]) {
+            const to   = Math.floor(Date.now() / 1000);
+            const from = to - PRESET_MINUTES[preset] * 60;
+            return { from, to };
+        }
+        const root = getRoot();
+        return {
+            from: parseInt(root?.dataset.fromTs || '0', 10),
+            to:   parseInt(root?.dataset.toTs   || '0', 10),
+        };
     }
 
     function setText(selector, text) {
@@ -177,103 +173,6 @@
     function bytesToMbps(b) {
         return Math.round(b * 8 / 60 / 1_000_000 * 100) / 100;
     }
-
-    function updateCards(rxBytes, txBytes) {
-        const rxMbps = bytesToMbps(rxBytes);
-        const txMbps = bytesToMbps(txBytes);
-        setText('[data-net-rx-mbps]',        rxMbps);
-        setText('[data-net-tx-mbps]',        txMbps);
-        setText('[data-net-rx-mbps-legend]', rxMbps);
-        setText('[data-net-tx-mbps-legend]', txMbps);
-    }
-
-    function shiftAndPush(label, rxValue, txValue) {
-        chart.data.labels.shift();
-        chart.data.labels.push(label);
-        chart.data.datasets[0].data.shift();
-        chart.data.datasets[0].data.push(rxValue);
-        chart.data.datasets[1].data.shift();
-        chart.data.datasets[1].data.push(txValue);
-        chart.update('none');
-
-        const first = chart.data.labels[0];
-        const last  = chart.data.labels[chart.data.labels.length - 1];
-        setText('[data-net-period]', `${first} – ${last}`);
-    }
-
-    function buildChart() {
-        const canvas = document.getElementById(id);
-        if (!canvas) return;
-        const data = JSON.parse(canvas.dataset.chart || '{"labels":[],"rx":[],"tx":[]}');
-        if (chart) chart.destroy();
-
-        chart = new Chart(canvas, {
-            type: 'line',
-            data: {
-                labels: data.labels,
-                datasets: [
-                    {
-                        label: 'RX',
-                        data: data.rx,
-                        borderColor: 'rgb(52, 211, 153)',
-                        backgroundColor: 'rgba(52, 211, 153, 0.08)',
-                        borderWidth: 1.5,
-                        pointRadius: 0,
-                        fill: true,
-                        tension: 0.4,
-                        spanGaps: true,
-                    },
-                    {
-                        label: 'TX',
-                        data: data.tx,
-                        borderColor: 'rgb(251, 191, 36)',
-                        backgroundColor: 'rgba(251, 191, 36, 0.08)',
-                        borderWidth: 1.5,
-                        pointRadius: 0,
-                        fill: true,
-                        tension: 0.4,
-                        spanGaps: true,
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: false,
-                interaction: { mode: 'index', intersect: false },
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        backgroundColor: '#1a1a1a',
-                        borderColor: '#3a3a3a',
-                        borderWidth: 1,
-                        titleColor: '#e5e7eb',
-                        bodyColor: '#9ca3af',
-                        titleFont: { family: 'monospace', size: 11 },
-                        bodyFont:  { family: 'monospace', size: 11 },
-                        callbacks: {
-                            label: ctx => ' ' + ctx.dataset.label + ': ' + ctx.parsed.y + ' Mbps'
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 }, maxTicksLimit: 8 },
-                        grid:  { color: 'rgba(255,255,255,0.04)' },
-                        border: { color: '#2a2a2a' },
-                    },
-                    y: {
-                        ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 } },
-                        grid:  { color: 'rgba(255,255,255,0.04)' },
-                        border: { color: '#2a2a2a' },
-                        beginAtZero: true,
-                    }
-                }
-            }
-        });
-    }
-
-    buildChart();
 
     function escapeHtml(s) {
         return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -288,7 +187,7 @@
             return;
         }
 
-        const html = byIp.map(row => {
+        tbody.innerHTML = byIp.map(row => {
             const total = Math.max(1, row.total);
             const pctEst    = Math.round(row.established / total * 100);
             const pctClosed = Math.round(row.closed      / total * 100);
@@ -314,60 +213,86 @@
                     </td>
                 </tr>`;
         }).join('');
-
-        tbody.innerHTML = html;
     }
 
-    function onEvent(e) {
-        if (e.type === 'connections') {
-            setText('[data-net-established]',  e.payload.established);
-            setText('[data-net-closed-other]', e.payload.closed_other);
-            rebuildConnTable(e.payload.by_ip);
-            return;
-        }
-
-        if (e.type !== 'network') return;
-        if (!isLive()) return;
-
-        const { bucketSeconds, labelFormat } = getConfig();
-        if (bucketSeconds <= 0) return;
-
-        const ts = e.collectedAt;
-        const rx = e.payload.rx_bytes;
-        const tx = e.payload.tx_bytes;
-
-        updateCards(rx, tx);
-
-        const bucketStart = Math.floor(ts / bucketSeconds) * bucketSeconds;
-
-        if (pending && pending.start !== bucketStart) {
-            const rxAvg = pending.rxSum / pending.rxCount;
-            const txAvg = pending.txSum / pending.txCount;
-            shiftAndPush(
-                formatLabel(pending.start, labelFormat),
-                bytesToMbps(rxAvg),
-                bytesToMbps(txAvg)
-            );
-            pending = null;
-        }
-
-        if (!pending) {
-            pending = { start: bucketStart, rxSum: 0, rxCount: 0, txSum: 0, txCount: 0 };
-        }
-        pending.rxSum   += rx;
-        pending.rxCount += 1;
-        pending.txSum   += tx;
-        pending.txCount += 1;
+    function updateCards(d) {
+        const rxMbps = bytesToMbps(d.rxBytes);
+        const txMbps = bytesToMbps(d.txBytes);
+        setText('[data-net-rx-mbps]',        rxMbps);
+        setText('[data-net-tx-mbps]',        txMbps);
+        setText('[data-net-rx-mbps-legend]', rxMbps);
+        setText('[data-net-tx-mbps-legend]', txMbps);
+        setText('[data-net-established]',    d.totalEstablished);
+        setText('[data-net-closed-other]',   d.closedOther);
+        setText('[data-net-period]',         d.periodLabel);
+        rebuildConnTable(d.byIp);
     }
 
-    if (window.Echo) {
-        window.Echo.channel('metrics').listen('.MetricCollected', onEvent);
+    function applyChartData(c) {
+        if (!chart || !c) return;
+        chart.data.labels           = c.labels;
+        chart.data.datasets[0].data = c.rx;
+        chart.data.datasets[1].data = c.tx;
+        chart.update('none');
     }
+
+    function buildChart() {
+        const canvas = document.getElementById(id);
+        if (!canvas) return;
+        const data = JSON.parse(canvas.dataset.chart || '{"labels":[],"rx":[],"tx":[]}');
+        if (chart) chart.destroy();
+
+        chart = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: data.labels,
+                datasets: [
+                    { label: 'RX', data: data.rx, borderColor: 'rgb(52, 211, 153)',  backgroundColor: 'rgba(52, 211, 153, 0.08)',  borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.4, spanGaps: true },
+                    { label: 'TX', data: data.tx, borderColor: 'rgb(251, 191, 36)',  backgroundColor: 'rgba(251, 191, 36, 0.08)',  borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.4, spanGaps: true }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#1a1a1a', borderColor: '#3a3a3a', borderWidth: 1,
+                        titleColor: '#e5e7eb', bodyColor: '#9ca3af',
+                        titleFont: { family: 'monospace', size: 11 }, bodyFont: { family: 'monospace', size: 11 },
+                        callbacks: { label: ctx => ' ' + ctx.dataset.label + ': ' + ctx.parsed.y + ' Mbps' }
+                    }
+                },
+                scales: {
+                    x: { ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 }, maxTicksLimit: 8 }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#2a2a2a' } },
+                    y: { ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#2a2a2a' }, beginAtZero: true }
+                }
+            }
+        });
+    }
+
+    buildChart();
+
+    poller = window.createPoller({
+        getUrl: () => {
+            const { from, to } = getTimeRange();
+            if (!from || !to) return null;
+            return `/poll/metrics?type=network&from=${from}&to=${to}`;
+        },
+        intervalMs: getBucketMs(),
+        onData: (d) => {
+            updateCards(d);
+            applyChartData(d.chartData);
+        },
+    });
+    poller.start();
 
     Livewire.hook('morph.updated', ({ component }) => {
         if (component.name === 'network-metrics') {
             buildChart();
-            pending = null;
+            poller.setInterval(getBucketMs());
         }
     });
 })();

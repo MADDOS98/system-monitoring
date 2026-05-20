@@ -6,7 +6,7 @@
     {{-- Header --}}
     <div class="flex items-center justify-between px-4 py-2.5 bg-sidebar border-b border-border flex-shrink-0">
         <span class="text-xs font-mono font-semibold text-[#e5e7eb]">Requests by status</span>
-        <span class="text-xs font-mono text-[#6b7280]">{{ number_format($byStatus->sum('total')) }} total</span>
+        <span data-status-total class="text-xs font-mono text-[#6b7280]">{{ number_format($byStatus->sum('total')) }} total</span>
     </div>
 
     {{-- Top gradient bar --}}
@@ -19,7 +19,7 @@
             $e2 = $p2; $e3 = $e2 + $p3; $e4 = $e3 + $p4; $e5 = $e4 + $p5;
             $topGradient = "linear-gradient(to right, #22c55e 0% {$e2}%, #3b82f6 {$e2}% {$e3}%, #eab308 {$e3}% {$e4}%, #ef4444 {$e4}% {$e5}%)";
         @endphp
-        <div class="w-full rounded-full h-2" style="background: {{ $topGradient }}"></div>
+        <div data-status-top-bar class="w-full rounded-full h-2" style="background: {{ $topGradient }}"></div>
     </div>
 
     {{-- Status rows --}}
@@ -44,23 +44,17 @@
                         <span class="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded {{ $grp['badge'] }}">{{ $grp['group'] }}</span>
                         <span class="text-xs font-mono text-[#e5e7eb]">{{ $grp['label'] }}</span>
                     </div>
-                    <span class="text-xs font-mono font-semibold text-[#e5e7eb]">{{ number_format($count) }}</span>
+                    <span data-status-count-{{ $grp['group'] }} class="text-xs font-mono font-semibold text-[#e5e7eb]">{{ number_format($count) }}</span>
                 </div>
                 <div class="flex items-center justify-between mb-1.5">
                     <span class="text-[10px] font-mono text-[#6b7280]">{{ $grp['sub'] }}</span>
-                    <span class="text-[10px] font-mono text-[#6b7280]">{{ $pct }}%</span>
+                    <span data-status-pct-{{ $grp['group'] }} class="text-[10px] font-mono text-[#6b7280]">{{ $pct }}%</span>
                 </div>
                 <div class="w-full bg-[#2a2a2a] rounded-full h-1 overflow-hidden">
-                    <div class="{{ $grp['bar'] }} h-1 rounded-full transition-all duration-500" style="width: {{ $pct }}%"></div>
+                    <div data-status-bar-{{ $grp['group'] }} class="{{ $grp['bar'] }} h-1 rounded-full transition-all duration-500" style="width: {{ $pct }}%"></div>
                 </div>
             </div>
         @endforeach
-
-        @if($byStatus->isEmpty())
-            <div class="flex items-center justify-center h-full text-[#6b7280] text-xs font-mono">
-                No data available.
-            </div>
-        @endif
     </div>
 
 @script
@@ -68,23 +62,47 @@
 (function () {
     const componentId = '{{ $this->getId() }}';
     function getRoot() { return document.querySelector('[wire\\:id="' + componentId + '"]'); }
-    function isLive() {
-        const picker = document.querySelector('[data-live]');
-        return picker?.dataset.live === '1';
+
+    function setText(selector, text) {
+        const el = getRoot()?.querySelector(selector);
+        if (el) el.textContent = text;
+    }
+    function setStyle(selector, prop, val) {
+        const el = getRoot()?.querySelector(selector);
+        if (el) el.style[prop] = val;
     }
 
-    let pendingRefresh = false;
-    function scheduleRefresh() {
-        if (!isLive()) return;
-        if (pendingRefresh) return;
-        pendingRefresh = true;
-        const ms = parseInt(getRoot()?.dataset.bucketSeconds || '1', 10) * 1000;
-        setTimeout(() => { $wire.$refresh(); pendingRefresh = false; }, ms);
+    function updateStatus(status) {
+        if (!status) return;
+        const total = Math.max(1, status.total || 0);
+        const counts = { '2xx': status['2xx'] || 0, '3xx': status['3xx'] || 0, '4xx': status['4xx'] || 0, '5xx': status['5xx'] || 0 };
+        const pct = {
+            '2xx': Math.round(counts['2xx'] / total * 1000) / 10,
+            '3xx': Math.round(counts['3xx'] / total * 1000) / 10,
+            '4xx': Math.round(counts['4xx'] / total * 1000) / 10,
+            '5xx': Math.round(counts['5xx'] / total * 1000) / 10,
+        };
+
+        setText('[data-status-total]', `${Number(status.total || 0).toLocaleString()} total`);
+
+        const e2 = pct['2xx'];
+        const e3 = e2 + pct['3xx'];
+        const e4 = e3 + pct['4xx'];
+        const e5 = e4 + pct['5xx'];
+        const gradient = `linear-gradient(to right, #22c55e 0% ${e2}%, #3b82f6 ${e2}% ${e3}%, #eab308 ${e3}% ${e4}%, #ef4444 ${e4}% ${e5}%)`;
+        setStyle('[data-status-top-bar]', 'background', gradient);
+
+        ['2xx', '3xx', '4xx', '5xx'].forEach((grp) => {
+            setText(`[data-status-count-${grp}]`,   Number(counts[grp]).toLocaleString());
+            setText(`[data-status-pct-${grp}]`,     pct[grp] + '%');
+            setStyle(`[data-status-bar-${grp}]`, 'width', pct[grp] + '%');
+        });
     }
 
-    if (window.Echo) {
-        window.Echo.channel('apache-logs').listen('.ApacheLogCreated', scheduleRefresh);
-    }
+    document.addEventListener('apache-logs-poll', (e) => {
+        if (!e.detail) return;
+        updateStatus(e.detail.status);
+    });
 })();
 </script>
 @endscript

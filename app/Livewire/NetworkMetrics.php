@@ -2,11 +2,10 @@
 
 namespace App\Livewire;
 
-use Livewire\Component;
-use Livewire\Attributes\On;
-use App\Models\NetworkMetric;
-use App\Models\ConnectionMetric;
+use App\Services\Monitoring\NetworkMetricsQuery;
 use Carbon\Carbon;
+use Livewire\Attributes\On;
+use Livewire\Component;
 
 class NetworkMetrics extends Component
 {
@@ -29,165 +28,8 @@ class NetworkMetrics extends Component
 
     public function render()
     {
-        $tz = config('app.timezone');
+        $data = app(NetworkMetricsQuery::class)->snapshot($this->fromTs, $this->toTs);
 
-        $latest = NetworkMetric::orderByDesc('collected_at')->first();
-
-        $rxBytes = $latest?->rx_bytes ?? 0;
-        $txBytes = $latest?->tx_bytes ?? 0;
-
-        // Connection metrics: ultima inregistrare comuna pentru toate IP-urile
-        $latestConnTs = ConnectionMetric::max('collected_at') ?? 0;
-        $connRows     = $latestConnTs > 0
-            ? ConnectionMetric::where('collected_at', $latestConnTs)->get()
-            : collect();
-
-        $totalEstablished = 0;
-        $totalClosed      = 0;
-        $totalOther       = 0;
-        $byIp             = [];
-
-        foreach ($connRows as $row) {
-            $cat = $this->categorizeStates($row->state_counts ?? []);
-            $totalEstablished += $cat['established'];
-            $totalClosed      += $cat['closed'];
-            $totalOther       += $cat['other'];
-            $byIp[] = [
-                'ip'          => $row->local_ip,
-                'total'       => $row->total_connections,
-                'established' => $cat['established'],
-                'closed'      => $cat['closed'],
-                'other'       => $cat['other'],
-            ];
-        }
-
-        usort($byIp, fn($a, $b) => $b['total'] <=> $a['total']);
-
-        $closedOther = $totalClosed + $totalOther;
-
-        $diffSeconds = $this->toTs - $this->fromTs;
-        $labelFormat = $diffSeconds >= 86400 ? 'Y-m-d H:i' : 'H:i';
-
-        $periodLabel = Carbon::createFromTimestamp($this->fromTs, $tz)->format($labelFormat)
-            . ' – '
-            . Carbon::createFromTimestamp($this->toTs, $tz)->format($labelFormat);
-
-        $chartData = $this->getChartData();
-
-        $bucketSeconds = $this->resolveBucketSeconds(max(1, $diffSeconds));
-        $labelFormat   = $this->resolveLabelFormat($bucketSeconds, max(1, $diffSeconds));
-
-        return view('livewire.network-metrics', compact(
-            'rxBytes', 'txBytes', 'chartData', 'periodLabel',
-            'bucketSeconds', 'labelFormat',
-            'totalEstablished', 'closedOther', 'byIp'
-        ));
-    }
-
-    /**
-     * Imparte un dictionar state => count in 3 categorii:
-     *   established = ESTABLISHED
-     *   closed      = stari de inchidere (CLOSE, CLOSE_WAIT, TIME_WAIT, FIN_WAIT1/2, LAST_ACK, CLOSING)
-     *   other       = orice altceva (LISTEN, SYN_SENT, SYN_RECV, etc.)
-     */
-    private function categorizeStates(array $stateCounts): array
-    {
-        $closedStates = ['CLOSE', 'CLOSE_WAIT', 'TIME_WAIT', 'FIN_WAIT1', 'FIN_WAIT2', 'LAST_ACK', 'CLOSING'];
-
-        $est = 0;
-        $closed = 0;
-        $other = 0;
-
-        foreach ($stateCounts as $state => $count) {
-            if ($state === 'ESTABLISHED') {
-                $est += $count;
-            } elseif (in_array($state, $closedStates, true)) {
-                $closed += $count;
-            } else {
-                $other += $count;
-            }
-        }
-
-        return ['established' => $est, 'closed' => $closed, 'other' => $other];
-    }
-
-    private function getChartData(): array
-    {
-        $tz          = config('app.timezone');
-        $diffSeconds = $this->toTs - $this->fromTs;
-
-        if ($diffSeconds <= 0) {
-            return ['labels' => [], 'rx' => [], 'tx' => []];
-        }
-
-        $bucketSeconds = $this->resolveBucketSeconds($diffSeconds);
-        $bucketCount   = (int) ceil($diffSeconds / $bucketSeconds);
-
-        $rows = NetworkMetric::whereBetween('collected_at', [$this->fromTs, $this->toTs])
-            ->orderBy('collected_at')
-            ->get(['collected_at', 'rx_bytes', 'tx_bytes']);
-
-        $buckets = [];
-        for ($i = 0; $i < $bucketCount; $i++) {
-            $buckets[$i] = [
-                'rxSum' => 0,
-                'txSum' => 0,
-                'count' => 0,
-                'ts'    => $this->fromTs + $i * $bucketSeconds,
-            ];
-        }
-
-        foreach ($rows as $row) {
-            $offset = $row->collected_at - $this->fromTs;
-            $key    = (int) floor($offset / $bucketSeconds);
-            if (!isset($buckets[$key])) {
-                continue;
-            }
-            $buckets[$key]['rxSum'] += $row->rx_bytes;
-            $buckets[$key]['txSum'] += $row->tx_bytes;
-            $buckets[$key]['count'] += 1;
-        }
-
-        $labelFormat = $this->resolveLabelFormat($bucketSeconds, $diffSeconds);
-
-        $labels = [];
-        $rx     = [];
-        $tx     = [];
-        foreach ($buckets as $b) {
-            $labels[] = Carbon::createFromTimestamp($b['ts'], $tz)->format($labelFormat);
-            if ($b['count'] > 0) {
-                // bytes/minute -> Mbps: bytes * 8 / 60 / 1_000_000
-                $rx[] = round(($b['rxSum'] / $b['count']) * 8 / 60 / 1_000_000, 2);
-                $tx[] = round(($b['txSum'] / $b['count']) * 8 / 60 / 1_000_000, 2);
-            } else {
-                $rx[] = 0;
-                $tx[] = 0;
-            }
-        }
-
-        return ['labels' => $labels, 'rx' => $rx, 'tx' => $tx];
-    }
-
-    private function resolveBucketSeconds(int $diffSeconds): int
-    {
-        $minutes = $diffSeconds / 60;
-
-        return match (true) {
-            $minutes <  20     => 1,
-            $minutes <  100    => 5,
-            $minutes <  720    => 60,
-            $minutes <  4320   => 300,
-            $minutes <  20160  => 900,
-            $minutes <  86400  => 3600,
-            default            => 86400,
-        };
-    }
-
-    private function resolveLabelFormat(int $bucketSeconds, int $diffSeconds): string
-    {
-        if ($bucketSeconds < 60)     return 'H:i:s';
-        if ($diffSeconds   < 86400)  return 'H:i';
-        if ($bucketSeconds >= 86400) return 'M j';
-        return 'M j H:i';
+        return view('livewire.network-metrics', $data);
     }
 }

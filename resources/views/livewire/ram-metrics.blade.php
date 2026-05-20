@@ -2,6 +2,10 @@
     wire:key="ram-metrics"
     data-bucket-seconds="{{ $bucketSeconds }}"
     data-label-format="{{ $labelFormat }}"
+    data-from-ts="{{ $this->fromTs }}"
+    data-to-ts="{{ $this->toTs }}"
+    data-total-kb="{{ $totalKb }}"
+    data-label-format="{{ $labelFormat }}"
     data-total-kb="{{ $totalKb }}">
 
     {{-- Card 1: Stats --}}
@@ -87,38 +91,31 @@
 (function() {
     const id          = 'ram-chart-{{ $this->getId() }}';
     const componentId = '{{ $this->getId() }}';
-    let chart   = null;
-    let pending = null; // { start, sum, count }
+    const PRESET_MINUTES = { '5m': 5, '1h': 60, '24h': 1440 };
+    let chart  = null;
+    let poller = null;
 
-    function pad(n) { return String(n).padStart(2, '0'); }
+    function getRoot() { return document.querySelector('[wire\\:id="' + componentId + '"]'); }
 
-    function getRoot() {
-        return document.querySelector('[wire\\:id="' + componentId + '"]');
+    function getBucketMs() {
+        const sec = parseInt(getRoot()?.dataset.bucketSeconds || '1', 10);
+        return Math.max(1, sec) * 1000;
     }
 
-    function getConfig() {
-        const el = getRoot();
-        return {
-            bucketSeconds: parseInt(el?.dataset.bucketSeconds || '0', 10),
-            labelFormat:   el?.dataset.labelFormat || 'H:i:s',
-            totalKb:       parseInt(el?.dataset.totalKb || '0', 10),
-        };
-    }
-
-    function formatLabel(ts, fmt) {
-        const d = new Date(ts * 1000);
-        switch (fmt) {
-            case 'H:i:s':   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-            case 'H:i':     return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-            case 'M j':     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            case 'M j H:i': return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
-            default:        return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-        }
-    }
-
-    function isLive() {
+    function getTimeRange() {
         const picker = document.querySelector('[data-live]');
-        return picker?.dataset.live === '1';
+        const live   = picker?.dataset.live === '1';
+        const preset = picker?.dataset.preset;
+        if (live && PRESET_MINUTES[preset]) {
+            const to   = Math.floor(Date.now() / 1000);
+            const from = to - PRESET_MINUTES[preset] * 60;
+            return { from, to };
+        }
+        const root = getRoot();
+        return {
+            from: parseInt(root?.dataset.fromTs || '0', 10),
+            to:   parseInt(root?.dataset.toTs   || '0', 10),
+        };
     }
 
     function setText(selector, text) {
@@ -126,23 +123,25 @@
         if (el) el.textContent = text;
     }
 
-    function updateCards(usedKb) {
-        const { totalKb } = getConfig();
+    function updateCards(d) {
+        const totalKb = d.totalKb;
+        const usedKb  = d.usedKb;
         if (totalKb <= 0) return;
-
         const usedGb  = Math.round((usedKb / (1024*1024)) * 100) / 100;
-        const freeGb  = Math.round(((totalKb - usedKb) / (1024*1024)) * 100) / 100;
+        const freeGb  = Math.round((d.freeKb / (1024*1024)) * 100) / 100;
         const totalGb = Math.round((totalKb / (1024*1024)) * 100) / 100;
-        const pct     = Math.round((usedKb / totalKb) * 1000) / 10;
+        const pct     = d.usedPct;
         const high    = pct >= 75;
 
-        setText('[data-ram-used-gb]',       usedGb);
-        setText('[data-ram-used-pct]',      pct);
-        setText('[data-ram-bar-pct]',       pct);
-        setText('[data-ram-free-gb]',       freeGb);
-        setText('[data-ram-used-gb-chart]', usedGb);
-        setText('[data-ram-pressure-label]', `${usedGb} GB / ${totalGb} GB`);
+        setText('[data-ram-total-gb]',        totalGb);
+        setText('[data-ram-used-gb]',         usedGb);
+        setText('[data-ram-used-pct]',        pct);
+        setText('[data-ram-bar-pct]',         pct);
+        setText('[data-ram-free-gb]',         freeGb);
+        setText('[data-ram-used-gb-chart]',   usedGb);
+        setText('[data-ram-pressure-label]',  `${usedGb} GB / ${totalGb} GB`);
         setText('[data-ram-pressure-status]', high ? 'High pressure' : 'Normal');
+        setText('[data-ram-period]',          d.periodLabel);
 
         const bar = getRoot()?.querySelector('[data-ram-bar]');
         if (bar) {
@@ -162,17 +161,11 @@
         }
     }
 
-    function shiftAndPush(label, value) {
-        chart.data.labels.shift();
-        chart.data.labels.push(label);
-        chart.data.datasets[0].data.shift();
-        chart.data.datasets[0].data.push(value);
+    function applyChartData(c) {
+        if (!chart || !c) return;
+        chart.data.labels           = c.labels;
+        chart.data.datasets[0].data = c.values;
         chart.update('none');
-
-        // period label = first label – last label
-        const first = chart.data.labels[0];
-        const last  = chart.data.labels[chart.data.labels.length - 1];
-        setText('[data-ram-period]', `${first} – ${last}`);
     }
 
     function buildChart() {
@@ -189,11 +182,7 @@
                     data: data.values,
                     borderColor: 'rgb(6, 182, 212)',
                     backgroundColor: 'rgba(6, 182, 212, 0.08)',
-                    borderWidth: 1.5,
-                    pointRadius: 0,
-                    fill: true,
-                    tension: 0.4,
-                    spanGaps: true,
+                    borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.4, spanGaps: true,
                 }]
             },
             options: {
@@ -204,27 +193,15 @@
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: '#1a1a1a',
-                        borderColor: '#3a3a3a',
-                        borderWidth: 1,
-                        titleColor: '#e5e7eb',
-                        bodyColor: '#9ca3af',
-                        titleFont: { family: 'monospace', size: 11 },
-                        bodyFont:  { family: 'monospace', size: 11 },
+                        backgroundColor: '#1a1a1a', borderColor: '#3a3a3a', borderWidth: 1,
+                        titleColor: '#e5e7eb', bodyColor: '#9ca3af',
+                        titleFont: { family: 'monospace', size: 11 }, bodyFont: { family: 'monospace', size: 11 },
                         callbacks: { label: ctx => ' ' + ctx.parsed.y + ' GB' }
                     }
                 },
                 scales: {
-                    x: {
-                        ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 }, maxTicksLimit: 8 },
-                        grid:  { color: 'rgba(255,255,255,0.04)' },
-                        border: { color: '#2a2a2a' },
-                    },
-                    y: {
-                        ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 } },
-                        grid:  { color: 'rgba(255,255,255,0.04)' },
-                        border: { color: '#2a2a2a' },
-                    }
+                    x: { ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 }, maxTicksLimit: 8 }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#2a2a2a' } },
+                    y: { ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#2a2a2a' } }
                 }
             }
         });
@@ -232,43 +209,24 @@
 
     buildChart();
 
-    function onEvent(e) {
-        if (e.type !== 'ram') return;
-        if (!isLive()) return;
-
-        const { bucketSeconds, labelFormat } = getConfig();
-        if (bucketSeconds <= 0) return;
-
-        const ts     = e.collectedAt;
-        const usedKb = e.payload.used_kb;
-
-        // Carduri: actualizare la fiecare event (1s)
-        updateCards(usedKb);
-
-        // Chart: agregat pe bucket
-        const bucketStart = Math.floor(ts / bucketSeconds) * bucketSeconds;
-
-        if (pending && pending.start !== bucketStart) {
-            const avg = pending.sum / pending.count;
-            shiftAndPush(formatLabel(pending.start, labelFormat), Math.round(avg / (1024*1024) * 100) / 100);
-            pending = null;
-        }
-
-        if (!pending) {
-            pending = { start: bucketStart, sum: 0, count: 0 };
-        }
-        pending.sum   += usedKb;
-        pending.count += 1;
-    }
-
-    if (window.Echo) {
-        window.Echo.channel('metrics').listen('.MetricCollected', onEvent);
-    }
+    poller = window.createPoller({
+        getUrl: () => {
+            const { from, to } = getTimeRange();
+            if (!from || !to) return null;
+            return `/poll/metrics?type=ram&from=${from}&to=${to}`;
+        },
+        intervalMs: getBucketMs(),
+        onData: (d) => {
+            updateCards(d);
+            applyChartData(d.chartData);
+        },
+    });
+    poller.start();
 
     Livewire.hook('morph.updated', ({ component }) => {
         if (component.name === 'ram-metrics') {
             buildChart();
-            pending = null; // reset bucket-ul de tranzitie la schimbare de perioada
+            poller.setInterval(getBucketMs());
         }
     });
 })();

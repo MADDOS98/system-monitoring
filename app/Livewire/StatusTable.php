@@ -2,9 +2,10 @@
 
 namespace App\Livewire;
 
-use Livewire\Component;
+use App\Services\Monitoring\ApacheLogsQuery;
+use App\Services\Monitoring\BucketResolver;
 use Livewire\Attributes\On;
-use App\Models\ApacheLog;
+use Livewire\Component;
 
 class StatusTable extends Component
 {
@@ -26,46 +27,20 @@ class StatusTable extends Component
 
     public function render()
     {
-        // Grupare directa pe bucket-ul de status (2xx/3xx/4xx/5xx/other) — fara dublu-group in PHP.
-        $byStatus = ApacheLog::query()
-            ->when($this->from, fn($q) => $q->where('log_time', '>=', $this->from))
-            ->when($this->to,   fn($q) => $q->where('log_time', '<=', $this->to))
-            ->selectRaw('
-                CASE
-                    WHEN status BETWEEN 200 AND 299 THEN "2xx"
-                    WHEN status BETWEEN 300 AND 399 THEN "3xx"
-                    WHEN status BETWEEN 400 AND 499 THEN "4xx"
-                    WHEN status BETWEEN 500 AND 599 THEN "5xx"
-                    ELSE "other"
-                END as `group`,
-                COUNT(*) as total
-            ')
-            ->groupBy('group')
-            ->get()
-            ->map(fn($row) => (object) [
-                'group' => $row->group,
-                'total' => $row->total,
-            ]);
+        $diff          = max(1, ($this->to ?? 0) - ($this->from ?? 0));
+        $bucketSeconds = BucketResolver::secondsFor($diff);
 
-        $totalStat = $byStatus->sum('total') ?: 1;
+        $raw = app(ApacheLogsQuery::class)->byStatus((int) $this->from, (int) $this->to);
 
-        $bucketSeconds = $this->resolveBucketSeconds(max(1, ($this->to ?? 0) - ($this->from ?? 0)));
+        $totalStat = $raw['total'] ?: 1;
+        unset($raw['total']);
+
+        // Convertesc array asociativ -> Collection de obiecte cu props ->group, ->total,
+        // pentru compatibilitate cu blade-ul existent (`$byStatus->where('group', '2xx')`).
+        $byStatus = collect($raw)
+            ->map(fn($total, $group) => (object) ['group' => $group, 'total' => $total])
+            ->values();
 
         return view('livewire.status-table', compact('byStatus', 'totalStat', 'bucketSeconds'));
-    }
-
-    private function resolveBucketSeconds(int $diffSeconds): int
-    {
-        $minutes = $diffSeconds / 60;
-
-        return match (true) {
-            $minutes <  20     => 1,
-            $minutes <  100    => 5,
-            $minutes <  720    => 60,
-            $minutes <  4320   => 300,
-            $minutes <  20160  => 900,
-            $minutes <  86400  => 3600,
-            default            => 86400,
-        };
     }
 }

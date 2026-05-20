@@ -148,23 +148,81 @@
 (function () {
     const componentId = '{{ $this->getId() }}';
     function getRoot() { return document.querySelector('[wire\\:id="' + componentId + '"]'); }
-    function isLive() {
-        const picker = document.querySelector('[data-live]');
-        return picker?.dataset.live === '1';
+
+    function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
-    let pendingRefresh = false;
-    function scheduleRefresh() {
-        if (!isLive()) return;
-        if (pendingRefresh) return;
-        pendingRefresh = true;
-        const ms = parseInt(getRoot()?.dataset.bucketSeconds || '1', 10) * 1000;
-        setTimeout(() => { $wire.$refresh(); pendingRefresh = false; }, ms);
+    function formatBytes(b) {
+        b = b || 0;
+        if (b >= 1073741824) return (Math.round(b / 1073741824 * 10) / 10) + ' GB';
+        if (b >= 1048576)    return (Math.round(b / 1048576 * 10) / 10) + ' MB';
+        if (b >= 1024)       return (Math.round(b / 1024 * 10) / 10) + ' KB';
+        return b + ' B';
     }
 
-    if (window.Echo) {
-        window.Echo.channel('apache-logs').listen('.ApacheLogCreated', scheduleRefresh);
+    function tagClasses(status) {
+        switch (status) {
+            case 1: return 'bg-green-900 text-green-400';
+            case 2: return 'bg-yellow-950 text-yellow-400';
+            case 3: return 'bg-red-900 text-red-400';
+            default: return '';
+        }
     }
+
+    function rowBgIdle(status) {
+        switch (status) {
+            case 1: return 'bg-green-500/5';
+            case 2: return 'bg-yellow-500/5';
+            case 3: return 'bg-red-500/5';
+            default: return 'bg-[#111111]';
+        }
+    }
+
+    function buildIpRow(ip) {
+        const s2 = ip.s2xx, s3 = ip.s3xx, s4 = ip.s4xx, s5 = ip.s5xx;
+        const p2 = s2;
+        const p3 = p2 + s3;
+        const p4 = p3 + s4;
+        const p5 = p4 + s5;
+        const gradient = `linear-gradient(to right, #22c55e 0% ${p2}%, #3b82f6 ${p2}% ${p3}%, #eab308 ${p3}% ${p4}%, #ef4444 ${p4}% ${p5}%)`;
+        const showTag = ip.status !== null && ip.status !== undefined;
+        return `
+            <div class="relative grid grid-cols-12 px-4 py-2.5 transition-colors duration-100 items-center group ${rowBgIdle(ip.status)}">
+                <div class="absolute inset-0 bg-white opacity-0 group-hover:opacity-[0.04] transition-opacity duration-100 pointer-events-none"></div>
+                <div class="col-span-4">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="text-[#e5e7eb] text-xs font-mono">${escapeHtml(ip.ip)}</span>
+                        ${showTag ? `<span class="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded ${tagClasses(ip.status)}">${escapeHtml(ip.tag)}</span>` : ''}
+                    </div>
+                    ${showTag && ip.host ? `<div class="text-[10px] text-[#6b7280] font-mono mt-0.5 truncate">${escapeHtml(ip.host)}</div>` : ''}
+                </div>
+                <div class="col-span-2 text-xs font-mono text-[#e5e7eb]">${Number(ip.reqs).toLocaleString()}</div>
+                <div class="col-span-2 pr-2">
+                    <div class="w-full rounded-full h-1.5" style="background: ${gradient}"></div>
+                </div>
+                <div class="col-span-2 text-xs font-mono text-[#9ca3af] text-center">${escapeHtml(formatBytes(ip.total_bytes))}</div>
+                <div class="col-span-1 text-[10px] font-mono text-[#6b7280] text-right">${escapeHtml(ip.last_seen ?? '—')}</div>
+                <div class="col-span-1"></div>
+            </div>`;
+    }
+
+    function updateTopIps(topIps) {
+        const root = getRoot();
+        if (!root) return;
+        const container = root.querySelector('.overflow-y-auto.flex-1');
+        if (!container) return;
+        if (!Array.isArray(topIps) || topIps.length === 0) {
+            container.innerHTML = '<div class="flex items-center justify-center h-full text-[#6b7280] text-xs font-mono">No data available.</div>';
+            return;
+        }
+        container.innerHTML = topIps.map(buildIpRow).join('');
+    }
+
+    document.addEventListener('apache-logs-poll', (e) => {
+        if (!e.detail) return;
+        updateTopIps(e.detail.top_ips || []);
+    });
 })();
 </script>
 @endscript

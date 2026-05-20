@@ -1,9 +1,12 @@
 <div
     wire:key="disk-metrics"
+    data-bucket-seconds="{{ $bucketSecondsIo }}"
     data-bucket-io="{{ $bucketSecondsIo }}"
     data-bucket-usage="{{ $bucketSecondsUsage }}"
     data-label-format-io="{{ $labelFormatIo }}"
     data-label-format-usage="{{ $labelFormatUsage }}"
+    data-from-ts="{{ $this->fromTs }}"
+    data-to-ts="{{ $this->toTs }}"
     data-total-bytes="{{ $totalBytes }}">
 
     @php
@@ -132,46 +135,36 @@
 @script
 <script>
 (function () {
-    const ioId    = 'disk-io-chart-{{ $this->getId() }}';
-    const usageId = 'disk-usage-chart-{{ $this->getId() }}';
+    const ioId        = 'disk-io-chart-{{ $this->getId() }}';
+    const usageId     = 'disk-usage-chart-{{ $this->getId() }}';
     const componentId = '{{ $this->getId() }}';
+    const PRESET_MINUTES = { '5m': 5, '1h': 60, '24h': 1440 };
 
     let ioChart    = null;
     let usageChart = null;
-    let ioPending    = null; // { start, readSum, readCount, writeSum, writeCount }
-    let usagePending = null; // { start, sum, count }
+    let poller     = null;
 
-    function pad(n) { return String(n).padStart(2, '0'); }
+    function getRoot() { return document.querySelector('[wire\\:id="' + componentId + '"]'); }
 
-    function getRoot() {
-        return document.querySelector('[wire\\:id="' + componentId + '"]');
+    function getBucketMs() {
+        const sec = parseInt(getRoot()?.dataset.bucketSeconds || '1', 10);
+        return Math.max(1, sec) * 1000;
     }
 
-    function getConfig() {
-        const el = getRoot();
-        return {
-            bucketIo:        parseInt(el?.dataset.bucketIo        || '0', 10),
-            bucketUsage:     parseInt(el?.dataset.bucketUsage     || '0', 10),
-            labelFormatIo:   el?.dataset.labelFormatIo   || 'H:i:s',
-            labelFormatUsage:el?.dataset.labelFormatUsage|| 'H:i',
-            totalBytes:      parseInt(el?.dataset.totalBytes || '0', 10),
-        };
-    }
-
-    function formatLabel(ts, fmt) {
-        const d = new Date(ts * 1000);
-        switch (fmt) {
-            case 'H:i:s':   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-            case 'H:i':     return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-            case 'M j':     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            case 'M j H:i': return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
-            default:        return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-        }
-    }
-
-    function isLive() {
+    function getTimeRange() {
         const picker = document.querySelector('[data-live]');
-        return picker?.dataset.live === '1';
+        const live   = picker?.dataset.live === '1';
+        const preset = picker?.dataset.preset;
+        if (live && PRESET_MINUTES[preset]) {
+            const to   = Math.floor(Date.now() / 1000);
+            const from = to - PRESET_MINUTES[preset] * 60;
+            return { from, to };
+        }
+        const root = getRoot();
+        return {
+            from: parseInt(root?.dataset.fromTs || '0', 10),
+            to:   parseInt(root?.dataset.toTs   || '0', 10),
+        };
     }
 
     function setText(selector, text) {
@@ -179,29 +172,28 @@
         if (el) el.textContent = text;
     }
 
-    function bytesToMbs(b) {
-        return Math.round(b / 60 / 1_000_000 * 100) / 100;
-    }
+    function bytesToMbs(b) { return Math.round(b / 60 / 1_000_000 * 100) / 100; }
+    function bytesToGb(b)  { return Math.round(b / (1024*1024*1024) * 100) / 100; }
 
-    function bytesToGb(b) {
-        return Math.round(b / (1024*1024*1024) * 100) / 100;
-    }
+    function updateCards(d) {
+        // I/O
+        const r = bytesToMbs(d.readBytes);
+        const w = bytesToMbs(d.writeBytes);
+        setText('[data-disk-read-mbs]',         r);
+        setText('[data-disk-write-mbs]',        w);
+        setText('[data-disk-read-mbs-legend]',  r);
+        setText('[data-disk-write-mbs-legend]', w);
+        setText('[data-disk-io-period]',        d.periodLabel);
+        setText('[data-disk-usage-period]',     d.periodLabel);
 
-    function updateIoCards(readBytes, writeBytes) {
-        const r = bytesToMbs(readBytes);
-        const w = bytesToMbs(writeBytes);
-        setText('[data-disk-read-mbs]',        r);
-        setText('[data-disk-write-mbs]',       w);
-        setText('[data-disk-read-mbs-legend]', r);
-        setText('[data-disk-write-mbs-legend]',w);
-    }
-
-    function updateUsageCards(totalBytes, usedBytes) {
+        // Usage
+        const totalBytes = d.totalBytes;
+        const usedBytes  = d.usedBytes;
         if (totalBytes <= 0) return;
         const usedGb  = bytesToGb(usedBytes);
         const totalGb = bytesToGb(totalBytes);
         const freeGb  = Math.round((totalGb - usedGb) * 100) / 100;
-        const pct     = Math.round((usedBytes / totalBytes) * 1000) / 10;
+        const pct     = d.usedPct;
         const high    = pct >= 75;
 
         setText('[data-disk-total-gb]',        totalGb);
@@ -231,30 +223,19 @@
         }
     }
 
-    function shiftAndPushIo(label, rVal, wVal) {
-        ioChart.data.labels.shift();
-        ioChart.data.labels.push(label);
-        ioChart.data.datasets[0].data.shift();
-        ioChart.data.datasets[0].data.push(rVal);
-        ioChart.data.datasets[1].data.shift();
-        ioChart.data.datasets[1].data.push(wVal);
+    function applyIoChartData(c) {
+        if (!ioChart || !c) return;
+        ioChart.data.labels           = c.labels;
+        ioChart.data.datasets[0].data = c.read;
+        ioChart.data.datasets[1].data = c.write;
         ioChart.update('none');
-
-        const first = ioChart.data.labels[0];
-        const last  = ioChart.data.labels[ioChart.data.labels.length - 1];
-        setText('[data-disk-io-period]', `${first} – ${last}`);
     }
 
-    function shiftAndPushUsage(label, value) {
-        usageChart.data.labels.shift();
-        usageChart.data.labels.push(label);
-        usageChart.data.datasets[0].data.shift();
-        usageChart.data.datasets[0].data.push(value);
+    function applyUsageChartData(c) {
+        if (!usageChart || !c) return;
+        usageChart.data.labels           = c.labels;
+        usageChart.data.datasets[0].data = c.values;
         usageChart.update('none');
-
-        const first = usageChart.data.labels[0];
-        const last  = usageChart.data.labels[usageChart.data.labels.length - 1];
-        setText('[data-disk-usage-period]', `${first} – ${last}`);
     }
 
     function buildIoChart() {
@@ -268,28 +249,8 @@
             data: {
                 labels: data.labels,
                 datasets: [
-                    {
-                        label: 'read',
-                        data: data.read,
-                        borderColor: 'rgb(56, 189, 248)',
-                        backgroundColor: 'rgba(56, 189, 248, 0.08)',
-                        borderWidth: 1.5,
-                        pointRadius: 0,
-                        fill: true,
-                        tension: 0.4,
-                        spanGaps: true,
-                    },
-                    {
-                        label: 'write',
-                        data: data.write,
-                        borderColor: 'rgb(251, 113, 133)',
-                        backgroundColor: 'rgba(251, 113, 133, 0.08)',
-                        borderWidth: 1.5,
-                        pointRadius: 0,
-                        fill: true,
-                        tension: 0.4,
-                        spanGaps: true,
-                    }
+                    { label: 'read',  data: data.read,  borderColor: 'rgb(56, 189, 248)', backgroundColor: 'rgba(56, 189, 248, 0.08)', borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.4, spanGaps: true },
+                    { label: 'write', data: data.write, borderColor: 'rgb(251, 113, 133)',backgroundColor: 'rgba(251, 113, 133, 0.08)',borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.4, spanGaps: true }
                 ]
             },
             options: {
@@ -300,30 +261,15 @@
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: '#1a1a1a',
-                        borderColor: '#3a3a3a',
-                        borderWidth: 1,
-                        titleColor: '#e5e7eb',
-                        bodyColor: '#9ca3af',
-                        titleFont: { family: 'monospace', size: 11 },
-                        bodyFont:  { family: 'monospace', size: 11 },
-                        callbacks: {
-                            label: ctx => ' ' + ctx.dataset.label + ': ' + ctx.parsed.y + ' MB/s'
-                        }
+                        backgroundColor: '#1a1a1a', borderColor: '#3a3a3a', borderWidth: 1,
+                        titleColor: '#e5e7eb', bodyColor: '#9ca3af',
+                        titleFont: { family: 'monospace', size: 11 }, bodyFont: { family: 'monospace', size: 11 },
+                        callbacks: { label: ctx => ' ' + ctx.dataset.label + ': ' + ctx.parsed.y + ' MB/s' }
                     }
                 },
                 scales: {
-                    x: {
-                        ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 }, maxTicksLimit: 8 },
-                        grid:  { color: 'rgba(255,255,255,0.04)' },
-                        border: { color: '#2a2a2a' },
-                    },
-                    y: {
-                        ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 } },
-                        grid:  { color: 'rgba(255,255,255,0.04)' },
-                        border: { color: '#2a2a2a' },
-                        beginAtZero: true,
-                    }
+                    x: { ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 }, maxTicksLimit: 8 }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#2a2a2a' } },
+                    y: { ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#2a2a2a' }, beginAtZero: true }
                 }
             }
         });
@@ -343,11 +289,7 @@
                     data: data.values,
                     borderColor: 'rgb(6, 182, 212)',
                     backgroundColor: 'rgba(6, 182, 212, 0.08)',
-                    borderWidth: 1.5,
-                    pointRadius: 0,
-                    fill: true,
-                    tension: 0.4,
-                    spanGaps: true,
+                    borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.4, spanGaps: true,
                 }]
             },
             options: {
@@ -358,27 +300,15 @@
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: '#1a1a1a',
-                        borderColor: '#3a3a3a',
-                        borderWidth: 1,
-                        titleColor: '#e5e7eb',
-                        bodyColor: '#9ca3af',
-                        titleFont: { family: 'monospace', size: 11 },
-                        bodyFont:  { family: 'monospace', size: 11 },
+                        backgroundColor: '#1a1a1a', borderColor: '#3a3a3a', borderWidth: 1,
+                        titleColor: '#e5e7eb', bodyColor: '#9ca3af',
+                        titleFont: { family: 'monospace', size: 11 }, bodyFont: { family: 'monospace', size: 11 },
                         callbacks: { label: ctx => ' ' + ctx.parsed.y + ' GB' }
                     }
                 },
                 scales: {
-                    x: {
-                        ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 }, maxTicksLimit: 8 },
-                        grid:  { color: 'rgba(255,255,255,0.04)' },
-                        border: { color: '#2a2a2a' },
-                    },
-                    y: {
-                        ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 } },
-                        grid:  { color: 'rgba(255,255,255,0.04)' },
-                        border: { color: '#2a2a2a' },
-                    }
+                    x: { ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 }, maxTicksLimit: 8 }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#2a2a2a' } },
+                    y: { ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#2a2a2a' } }
                 }
             }
         });
@@ -387,78 +317,26 @@
     buildIoChart();
     buildUsageChart();
 
-    function onEvent(e) {
-        if (!isLive()) return;
-
-        if (e.type === 'disk_io') {
-            const { bucketIo, labelFormatIo } = getConfig();
-            if (bucketIo <= 0) return;
-
-            const ts = e.collectedAt;
-            const r  = e.payload.read_bytes;
-            const w  = e.payload.write_bytes;
-
-            updateIoCards(r, w);
-
-            const bucketStart = Math.floor(ts / bucketIo) * bucketIo;
-            if (ioPending && ioPending.start !== bucketStart) {
-                const rAvg = ioPending.readSum  / ioPending.readCount;
-                const wAvg = ioPending.writeSum / ioPending.writeCount;
-                shiftAndPushIo(
-                    formatLabel(ioPending.start, labelFormatIo),
-                    bytesToMbs(rAvg),
-                    bytesToMbs(wAvg)
-                );
-                ioPending = null;
-            }
-            if (!ioPending) {
-                ioPending = { start: bucketStart, readSum: 0, readCount: 0, writeSum: 0, writeCount: 0 };
-            }
-            ioPending.readSum   += r;
-            ioPending.readCount += 1;
-            ioPending.writeSum  += w;
-            ioPending.writeCount+= 1;
-            return;
-        }
-
-        if (e.type === 'disk_usage') {
-            const { bucketUsage, labelFormatUsage } = getConfig();
-            if (bucketUsage <= 0) return;
-
-            const ts    = e.collectedAt;
-            const total = e.payload.total_bytes;
-            const used  = e.payload.used_bytes;
-
-            updateUsageCards(total, used);
-
-            const bucketStart = Math.floor(ts / bucketUsage) * bucketUsage;
-            if (usagePending && usagePending.start !== bucketStart) {
-                const avg = usagePending.sum / usagePending.count;
-                shiftAndPushUsage(
-                    formatLabel(usagePending.start, labelFormatUsage),
-                    Math.round(avg / (1024*1024*1024) * 100) / 100
-                );
-                usagePending = null;
-            }
-            if (!usagePending) {
-                usagePending = { start: bucketStart, sum: 0, count: 0 };
-            }
-            usagePending.sum   += used;
-            usagePending.count += 1;
-            return;
-        }
-    }
-
-    if (window.Echo) {
-        window.Echo.channel('metrics').listen('.MetricCollected', onEvent);
-    }
+    poller = window.createPoller({
+        getUrl: () => {
+            const { from, to } = getTimeRange();
+            if (!from || !to) return null;
+            return `/poll/metrics?type=disk&from=${from}&to=${to}`;
+        },
+        intervalMs: getBucketMs(),
+        onData: (d) => {
+            updateCards(d);
+            applyIoChartData(d.ioChartData);
+            applyUsageChartData(d.usageChartData);
+        },
+    });
+    poller.start();
 
     Livewire.hook('morph.updated', ({ component }) => {
         if (component.name === 'disk-metrics') {
             buildIoChart();
             buildUsageChart();
-            ioPending    = null;
-            usagePending = null;
+            poller.setInterval(getBucketMs());
         }
     });
 })();

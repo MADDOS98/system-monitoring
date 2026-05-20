@@ -1,10 +1,17 @@
-<div wire:key="apache-logs-table" data-bucket-seconds="{{ $bucketSeconds }}">
+<div wire:key="apache-logs-table"
+     data-bucket-seconds="{{ $bucketSeconds }}"
+     data-current-page="{{ $logs->currentPage() }}"
+     data-has-search="{{ $searchQuery !== '' ? '1' : '0' }}"
+     data-search-query="{{ $searchQuery }}"
+     data-search-field="{{ $searchField }}"
+     data-page-size="20"
+     data-from-ts="{{ $this->from }}"
+     data-to-ts="{{ $this->to }}">
 
-    {{-- Toolbar cu search — ÎNĂUNTRUL componentei Livewire ca wire:model să funcționeze --}}
+    {{-- Toolbar cu search --}}
     <div class="flex items-center justify-between px-4 py-2.5 bg-sidebar border-b border-border"
         x-data="{ searchOpen: false }">
 
-        {{-- Left: Live requests + tailing --}}
         <div class="flex items-center gap-2">
             <svg class="w-3.5 h-3.5 text-[#6b7280]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path d="M4 6h16M4 12h16M4 18h7" />
@@ -14,7 +21,6 @@
             <span class="text-xs font-mono text-[#6b7280]">tailing</span>
         </div>
 
-        {{-- Right: search field + input --}}
         <div class="flex items-center gap-2">
 
             {{-- Search field dropdown --}}
@@ -65,48 +71,34 @@
         </div>
     </div>
 
+    {{-- Banner "X new entries available" --}}
+    <div data-new-entries-banner
+         style="display:none"
+         class="px-4 py-2 bg-blue-950/40 border-b border-blue-900/60 text-center cursor-pointer hover:bg-blue-950/60 transition-colors duration-150">
+        <span class="text-xs font-mono text-blue-300">
+            <span data-new-entries-count>0</span> new entries available — click to refresh
+        </span>
+    </div>
+
 <div class="overflow-x-auto overflow-y-auto" style="max-height: calc(10 * 41px)">
 
     <table class="w-full text-xs font-mono border-collapse">
-        
-        {{-- Table head fix --}}
+
         <thead>
             <tr class="bg-sidebar border-b border-border">
-
-                <th class="sticky top-0 z-10 bg-sidebar px-4 py-3 text-left text-[#6b7280] uppercase tracking-widest font-semibold whitespace-nowrap">
-                    Time
-                </th>
-
-                <th class="sticky top-0 z-10 bg-sidebar px-4 py-3 text-left text-[#6b7280] uppercase tracking-widest font-semibold whitespace-nowrap">
-                    Method
-                </th>
-
-                <th class="sticky top-0 z-10 bg-sidebar px-4 py-3 text-left text-[#6b7280] uppercase tracking-widest font-semibold whitespace-nowrap">
-                    Path
-                </th>
-
-                <th class="sticky top-0 z-10 bg-sidebar px-4 py-3 text-left text-[#6b7280] uppercase tracking-widest font-semibold whitespace-nowrap">
-                    Status
-                </th>
-
-                <th class="sticky top-0 z-10 bg-sidebar px-4 py-3 text-left text-[#6b7280] uppercase tracking-widest font-semibold whitespace-nowrap">
-                    MS
-                </th>
-
-                <th class="sticky top-0 z-10 bg-sidebar px-4 py-3 text-left text-[#6b7280] uppercase tracking-widest font-semibold whitespace-nowrap">
-                    IP
-                </th>
-
-                <th class="sticky top-0 z-10 bg-sidebar px-4 py-3 text-left text-[#6b7280] uppercase tracking-widest font-semibold whitespace-nowrap">
-                    UA
-                </th>
+                <th class="sticky top-0 z-10 bg-sidebar px-4 py-3 text-left text-[#6b7280] uppercase tracking-widest font-semibold whitespace-nowrap">Time</th>
+                <th class="sticky top-0 z-10 bg-sidebar px-4 py-3 text-left text-[#6b7280] uppercase tracking-widest font-semibold whitespace-nowrap">Method</th>
+                <th class="sticky top-0 z-10 bg-sidebar px-4 py-3 text-left text-[#6b7280] uppercase tracking-widest font-semibold whitespace-nowrap">Path</th>
+                <th class="sticky top-0 z-10 bg-sidebar px-4 py-3 text-left text-[#6b7280] uppercase tracking-widest font-semibold whitespace-nowrap">Status</th>
+                <th class="sticky top-0 z-10 bg-sidebar px-4 py-3 text-left text-[#6b7280] uppercase tracking-widest font-semibold whitespace-nowrap">MS</th>
+                <th class="sticky top-0 z-10 bg-sidebar px-4 py-3 text-left text-[#6b7280] uppercase tracking-widest font-semibold whitespace-nowrap">IP</th>
+                <th class="sticky top-0 z-10 bg-sidebar px-4 py-3 text-left text-[#6b7280] uppercase tracking-widest font-semibold whitespace-nowrap">UA</th>
             </tr>
         </thead>
 
-        {{-- Table body --}}
-        <tbody class="divide-y divide-[#2a2a2a]">
+        <tbody data-logs-tbody class="divide-y divide-[#2a2a2a]">
             @forelse ($logs as $log)
-            <tr class="bg-[#111111] hover:bg-[#161616] transition-colors duration-100">
+            <tr data-log-id="{{ $log->id }}" class="bg-[#111111] hover:bg-[#161616] transition-colors duration-100">
 
                 <td class="px-4 py-2.5 text-[#6b7280] whitespace-nowrap">
                     {{ isset($log->log_time) ? date('H:i:s', $log->log_time) : '—' }}
@@ -115,14 +107,13 @@
                 <td class="px-4 py-2.5 whitespace-nowrap">
                     @php
                     $mc = match($log->method ?? '') {
-                    'GET' => 'bg-blue-950 text-blue-400',
-                    'POST' => 'bg-green-950 text-green-400',
-                    'PUT', 'PATCH' => 'bg-yellow-950 text-yellow-400',
-                    'DELETE' => 'bg-red-950 text-red-400',
-                    default => 'bg-zinc-800 text-zinc-400',
+                        'GET' => 'bg-blue-950 text-blue-400',
+                        'POST' => 'bg-green-950 text-green-400',
+                        'PUT', 'PATCH' => 'bg-yellow-950 text-yellow-400',
+                        'DELETE' => 'bg-red-950 text-red-400',
+                        default => 'bg-zinc-800 text-zinc-400',
                     };
                     @endphp
-
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold {{ $mc }}">
                         {{ $log->method ?? '—' }}
                     </span>
@@ -135,22 +126,19 @@
                 <td class="px-4 py-2.5 whitespace-nowrap">
                     @php
                     $sc = match(true) {
-                    ($log->status ?? 0) >= 500 => 'bg-red-950 text-red-400',
-                    ($log->status ?? 0) >= 400 => 'bg-yellow-950 text-yellow-400',
-                    ($log->status ?? 0) >= 300 => 'bg-blue-950 text-blue-400',
-                    ($log->status ?? 0) >= 200 => 'bg-green-950 text-green-400',
-                    default => 'bg-zinc-800 text-zinc-400',
+                        ($log->status ?? 0) >= 500 => 'bg-red-950 text-red-400',
+                        ($log->status ?? 0) >= 400 => 'bg-yellow-950 text-yellow-400',
+                        ($log->status ?? 0) >= 300 => 'bg-blue-950 text-blue-400',
+                        ($log->status ?? 0) >= 200 => 'bg-green-950 text-green-400',
+                        default => 'bg-zinc-800 text-zinc-400',
                     };
                     @endphp
-
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold {{ $sc }}">
                         {{ $log->status ?? '—' }}
                     </span>
                 </td>
 
-                <td class="px-4 py-2.5 text-[#9ca3af] whitespace-nowrap">
-                    {{ '—' }}
-                </td>
+                <td class="px-4 py-2.5 text-[#9ca3af] whitespace-nowrap">—</td>
 
                 <td class="px-4 py-2.5 text-[#9ca3af] whitespace-nowrap">
                     {{ $log->remote_host ?? '—' }}
@@ -159,25 +147,21 @@
                 <td class="px-4 py-2.5 text-[#6b7280] whitespace-nowrap">
                     @php
                     $ua = $log->user_agent ?? '';
-
                     $uaShort = match(true) {
-                    str_contains($ua, 'curl') || str_contains($ua, 'python') || str_contains($ua, 'Go-http') => 'CLI',
-                    str_contains($ua, 'bot') || str_contains($ua, 'Bot') || str_contains($ua, 'spider') => 'Bot',
-                    str_contains($ua, 'Chrome') => 'Chrome',
-                    str_contains($ua, 'Firefox') => 'Firefox',
-                    str_contains($ua, 'Safari') => 'Safari',
-                    default => 'Other',
+                        str_contains($ua, 'curl') || str_contains($ua, 'python') || str_contains($ua, 'Go-http') => 'CLI',
+                        str_contains($ua, 'bot') || str_contains($ua, 'Bot') || str_contains($ua, 'spider') => 'Bot',
+                        str_contains($ua, 'Chrome') => 'Chrome',
+                        str_contains($ua, 'Firefox') => 'Firefox',
+                        str_contains($ua, 'Safari') => 'Safari',
+                        default => 'Other',
                     };
                     @endphp
-
-                    <span title="{{ $ua }}">
-                        {{ $uaShort }}
-                    </span>
+                    <span title="{{ $ua }}">{{ $uaShort }}</span>
                 </td>
             </tr>
             @empty
-            <tr>
-                <td colspan="9" class="px-4 py-12 text-center text-[#6b7280]">
+            <tr data-empty-row>
+                <td colspan="7" class="px-4 py-12 text-center text-[#6b7280]">
                     No log entries found.
                 </td>
             </tr>
@@ -221,24 +205,230 @@
 <script>
 (function () {
     const componentId = '{{ $this->getId() }}';
-    function getRoot() { return document.querySelector('[wire\\:id="' + componentId + '"]'); }
-    function isLive() {
+    const PRESET_MINUTES = { '5m': 5, '1h': 60, '24h': 1440 };
+
+    let lastSeenId   = 0;
+    let pendingCount = 0;
+    let poller       = null;
+
+    function getRoot()  { return document.querySelector('[wire\\:id="' + componentId + '"]'); }
+    function getTbody() { return getRoot()?.querySelector('[data-logs-tbody]'); }
+    function getBanner(){ return getRoot()?.querySelector('[data-new-entries-banner]'); }
+
+    function getState() {
+        const r = getRoot();
+        return {
+            currentPage: parseInt(r?.dataset.currentPage || '1', 10),
+            hasSearch:   r?.dataset.hasSearch === '1',
+            searchQuery: r?.dataset.searchQuery || '',
+            searchField: r?.dataset.searchField || 'any',
+            pageSize:    parseInt(r?.dataset.pageSize || '20', 10),
+        };
+    }
+
+    function getBucketMs() {
+        const sec = parseInt(getRoot()?.dataset.bucketSeconds || '1', 10);
+        return Math.max(1, sec) * 1000;
+    }
+
+    function getTimeRange() {
         const picker = document.querySelector('[data-live]');
-        return picker?.dataset.live === '1';
+        const live   = picker?.dataset.live === '1';
+        const preset = picker?.dataset.preset;
+        if (live && PRESET_MINUTES[preset]) {
+            const to   = Math.floor(Date.now() / 1000);
+            const from = to - PRESET_MINUTES[preset] * 60;
+            return { from, to };
+        }
+        const root = getRoot();
+        return {
+            from: parseInt(root?.dataset.fromTs || '0', 10),
+            to:   parseInt(root?.dataset.toTs   || '0', 10),
+        };
     }
 
-    let pendingRefresh = false;
-    function scheduleRefresh() {
-        if (!isLive()) return;
-        if (pendingRefresh) return;
-        pendingRefresh = true;
-        const ms = parseInt(getRoot()?.dataset.bucketSeconds || '1', 10) * 1000;
-        setTimeout(() => { $wire.$refresh(); pendingRefresh = false; }, ms);
+    function refreshLastSeenIdFromDom() {
+        const tbody = getTbody();
+        if (!tbody) return;
+        let max = 0;
+        tbody.querySelectorAll('[data-log-id]').forEach(tr => {
+            const id = parseInt(tr.dataset.logId || '0', 10);
+            if (id > max) max = id;
+        });
+        lastSeenId = max;
+    }
+    refreshLastSeenIdFromDom();
+
+    function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
-    if (window.Echo) {
-        window.Echo.channel('apache-logs').listen('.ApacheLogCreated', scheduleRefresh);
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function formatTime(ts) {
+        const d = new Date(ts * 1000);
+        return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     }
+
+    function methodClasses(method) {
+        switch (method) {
+            case 'GET':            return 'bg-blue-950 text-blue-400';
+            case 'POST':           return 'bg-green-950 text-green-400';
+            case 'PUT':
+            case 'PATCH':          return 'bg-yellow-950 text-yellow-400';
+            case 'DELETE':         return 'bg-red-950 text-red-400';
+            default:               return 'bg-zinc-800 text-zinc-400';
+        }
+    }
+
+    function statusClasses(status) {
+        const s = parseInt(status, 10) || 0;
+        if (s >= 500) return 'bg-red-950 text-red-400';
+        if (s >= 400) return 'bg-yellow-950 text-yellow-400';
+        if (s >= 300) return 'bg-blue-950 text-blue-400';
+        if (s >= 200) return 'bg-green-950 text-green-400';
+        return 'bg-zinc-800 text-zinc-400';
+    }
+
+    function uaShort(ua) {
+        ua = ua || '';
+        if (ua.includes('curl') || ua.includes('python') || ua.includes('Go-http')) return 'CLI';
+        if (ua.includes('bot')  || ua.includes('Bot')    || ua.includes('spider'))  return 'Bot';
+        if (ua.includes('Chrome'))  return 'Chrome';
+        if (ua.includes('Firefox')) return 'Firefox';
+        if (ua.includes('Safari'))  return 'Safari';
+        return 'Other';
+    }
+
+    function buildRowHtml(e) {
+        const time   = formatTime(e.log_time);
+        const method = e.method || '—';
+        const uri    = e.uri    || '—';
+        const status = e.status ?? '—';
+        const ip     = e.remote_host || '—';
+        const ua     = e.user_agent || '';
+        return `
+            <tr data-log-id="${escapeHtml(e.id)}" class="bg-[#111111] hover:bg-[#161616] transition-colors duration-100">
+                <td class="px-4 py-2.5 text-[#6b7280] whitespace-nowrap">${escapeHtml(time)}</td>
+                <td class="px-4 py-2.5 whitespace-nowrap">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold ${methodClasses(method)}">${escapeHtml(method)}</span>
+                </td>
+                <td class="px-4 py-2.5 text-[#e5e7eb] max-w-[240px] truncate">${escapeHtml(uri)}</td>
+                <td class="px-4 py-2.5 whitespace-nowrap">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${statusClasses(status)}">${escapeHtml(status)}</span>
+                </td>
+                <td class="px-4 py-2.5 text-[#9ca3af] whitespace-nowrap">—</td>
+                <td class="px-4 py-2.5 text-[#9ca3af] whitespace-nowrap">${escapeHtml(ip)}</td>
+                <td class="px-4 py-2.5 text-[#6b7280] whitespace-nowrap">
+                    <span title="${escapeHtml(ua)}">${escapeHtml(uaShort(ua))}</span>
+                </td>
+            </tr>`;
+    }
+
+    function updateBanner() {
+        const b = getBanner();
+        if (!b) return;
+        if (pendingCount > 0) {
+            b.style.display = '';
+            const c = b.querySelector('[data-new-entries-count]');
+            if (c) c.textContent = String(pendingCount);
+        } else {
+            b.style.display = 'none';
+        }
+    }
+
+    function resetBanner() {
+        pendingCount = 0;
+        updateBanner();
+    }
+
+    function bindBannerClick() {
+        const b = getBanner();
+        if (!b || b.dataset.bound === '1') return;
+        b.dataset.bound = '1';
+        b.addEventListener('click', () => {
+            $wire.$refresh();
+            resetBanner();
+        });
+    }
+
+    function prependRows(rows) {
+        const tbody = getTbody();
+        if (!tbody) return;
+
+        const empty = tbody.querySelector('[data-empty-row]');
+        if (empty) empty.remove();
+
+        // Rândurile vin DESC (cele mai noi primele). Le inserăm în ordinea aceasta la top.
+        const { pageSize } = getState();
+        for (const r of rows) {
+            if (tbody.querySelector(`[data-log-id="${CSS.escape(String(r.id))}"]`)) continue;
+            const tmp = document.createElement('tbody');
+            tmp.innerHTML = buildRowHtml(r).trim();
+            const newRow = tmp.firstElementChild;
+            if (newRow) tbody.insertBefore(newRow, tbody.firstChild);
+        }
+
+        // Taie ultimele dacă am depășit page size.
+        let rowsNow = tbody.querySelectorAll('tr[data-log-id]');
+        while (rowsNow.length > pageSize) {
+            tbody.lastElementChild.remove();
+            rowsNow = tbody.querySelectorAll('tr[data-log-id]');
+        }
+    }
+
+    function distributeToSiblings(payload) {
+        document.dispatchEvent(new CustomEvent('apache-logs-poll', { detail: payload }));
+    }
+
+    function onData(d) {
+        const newRows = d.new_logs?.rows || [];
+        if (newRows.length > 0) {
+            const maxId = Math.max(lastSeenId, ...newRows.map(r => r.id));
+            const { currentPage, hasSearch } = getState();
+
+            if (currentPage === 1 && !hasSearch) {
+                prependRows(newRows);
+            } else {
+                pendingCount += newRows.length;
+                updateBanner();
+            }
+            lastSeenId = maxId;
+        }
+
+        distributeToSiblings(d);
+    }
+
+    poller = window.createPoller({
+        getUrl: () => {
+            const { from, to }  = getTimeRange();
+            if (!from || !to) return null;
+            const s = getState();
+            const qs = new URLSearchParams({
+                from: String(from),
+                to:   String(to),
+                page: String(s.currentPage),
+                search:       s.searchQuery,
+                search_field: s.searchField,
+                tab:          'All',
+                since_id:     String(lastSeenId),
+            }).toString();
+            return `/poll/apache-logs?${qs}`;
+        },
+        intervalMs: getBucketMs(),
+        onData: onData,
+    });
+    poller.start();
+
+    Livewire.hook('morph.updated', ({ component }) => {
+        if (component.id !== componentId) return;
+        refreshLastSeenIdFromDom();
+        resetBanner();
+        bindBannerClick();
+        poller.setInterval(getBucketMs());
+    });
+
+    bindBannerClick();
 })();
 </script>
 @endscript

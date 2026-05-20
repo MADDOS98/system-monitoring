@@ -2,10 +2,11 @@
 
 namespace App\Livewire;
 
-use Livewire\Component;
+use App\Services\Monitoring\ApacheLogsQuery;
+use App\Services\Monitoring\BucketResolver;
 use Livewire\Attributes\On;
+use Livewire\Component;
 use Livewire\WithPagination;
-use App\Models\ApacheLog;
 
 class ApacheLogsTable extends Component
 {
@@ -32,7 +33,6 @@ class ApacheLogsTable extends Component
         $this->resetPage();
     }
 
-    // Reset paginarea cand se schimba cautarea
     public function updatingSearchQuery(): void
     {
         $this->resetPage();
@@ -45,51 +45,32 @@ class ApacheLogsTable extends Component
 
     public function render()
     {
-        $logs = ApacheLog::query()
-            ->when($this->from, fn($q) => $q->where('log_time', '>=', $this->from))
-            ->when($this->to,   fn($q) => $q->where('log_time', '<=', $this->to))
-            ->when($this->searchQuery !== '', function ($q) {
-                $query = $this->searchQuery;
-                $field = $this->searchField;
+        // Slide live window forward la fiecare actiune Livewire (paginare, search, refresh)
+        // ca query-ul sa nu rateze randurile noi prepend-uite de poller-ul JS.
+        $diff = ($this->to ?? 0) - ($this->from ?? 0);
+        $isLivePreset = in_array($diff, [300, 3600, 86400], true);
 
-                return match($field) {
-                    'IP'           => $q->where('remote_host', 'like', "%{$query}%"),
-                    'URL / endpoint' => $q->where('uri', 'like', "%{$query}%"),
-                    'User-Agent'   => $q->where('user_agent', 'like', "%{$query}%"),
-                    'HTTP status'  => $q->where('status', 'like', "%{$query}%"),
-                    'Method'       => $q->where('method', 'like', "%{$query}%"),
-                    default        => $q->where(function ($q2) use ($query) {
-                        $q2->where('remote_host', 'like', "%{$query}%")
-                           ->orWhere('uri', 'like', "%{$query}%")
-                           ->orWhere('status', 'like', "%{$query}%")
-                           ->orWhere('method', 'like', "%{$query}%")
-                           ->orWhere('user_agent', 'like', "%{$query}%");
-                    }),
-                };
-            })
-            ->orderByDesc('log_time')
-            ->paginate(20);
+        if ($isLivePreset) {
+            $effectiveTo   = now()->timestamp;
+            $effectiveFrom = $effectiveTo - $diff;
+        } else {
+            $effectiveTo   = $this->to;
+            $effectiveFrom = $this->from;
+        }
 
-        $bucketSeconds = $this->resolveBucketSeconds(max(1, ($this->to ?? 0) - ($this->from ?? 0)));
+        $logs = app(ApacheLogsQuery::class)->paginate(
+            (int) $effectiveFrom,
+            (int) $effectiveTo,
+            $this->getPage(),
+            $this->searchQuery,
+            $this->searchField
+        );
+
+        $bucketSeconds = BucketResolver::secondsFor(max(1, $diff));
 
         return view('livewire.apache-logs-table', [
             'logs'          => $logs,
             'bucketSeconds' => $bucketSeconds,
         ]);
-    }
-
-    private function resolveBucketSeconds(int $diffSeconds): int
-    {
-        $minutes = $diffSeconds / 60;
-
-        return match (true) {
-            $minutes <  20     => 1,
-            $minutes <  100    => 5,
-            $minutes <  720    => 60,
-            $minutes <  4320   => 300,
-            $minutes <  20160  => 900,
-            $minutes <  86400  => 3600,
-            default            => 86400,
-        };
     }
 }

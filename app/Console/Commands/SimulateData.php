@@ -172,28 +172,26 @@ class SimulateData extends Command
     {
         $hour = (int) date('G', $ts);
 
-        // Insert prin Eloquent — observerele inregistrate in AppServiceProvider
-        // declanseaza broadcasturile MetricCollected automat. Niciun dispatch
-        // manual aici, ca sa fie source-agnostic.
+        // Simulator pentru aplicatia externa care ar scrie in DB.
+        // Frontend-ul foloseste polling adaptiv (/poll/*) — nu mai sunt observers/broadcasts.
         RamMetric::create($this->buildRamRow($ts, $hour));
         NetworkMetric::create($this->buildNetworkRow($ts, $hour));
         DiskIoMetric::create($this->buildDiskIoRow($ts, $hour));
         CpuMetric::create($this->buildCpuRow($ts, $hour));
 
-        // disk_usage se inregistreaza o data pe minut
+        // disk_usage: 1 row / minut
         if ($ts % 60 === 0) {
             DiskUsageMetric::create($this->buildDiskUsageRow($ts));
         }
 
-        // connection_metrics se inregistreaza o data pe minut (mai multe randuri / IP).
-        // Observer-ul fire-uieste 'connections' agregat dupa fiecare row creat.
+        // connection_metrics: 1 row / minut per IP local
         if ($ts % 60 === 0) {
             foreach ($this->buildConnectionRows($ts, $hour) as $row) {
                 ConnectionMetric::create($row);
             }
         }
 
-        // apache_logs: 1 row/sec. Observer-ul fire-uieste 'ApacheLogCreated'.
+        // apache_logs: 1 row / secunda
         ApacheLog::create($this->buildApacheLogRow($ts));
     }
 

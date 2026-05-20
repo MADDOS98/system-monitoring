@@ -1,7 +1,9 @@
 <div
     wire:key="cpu-metrics"
     data-bucket-seconds="{{ $bucketSeconds }}"
-    data-label-format="{{ $labelFormat }}">
+    data-label-format="{{ $labelFormat }}"
+    data-from-ts="{{ $this->fromTs }}"
+    data-to-ts="{{ $this->toTs }}">
 
     {{-- Card 1: Stats --}}
     <div class="grid grid-cols-4 gap-4 mb-4">
@@ -97,37 +99,31 @@
 (function () {
     const id          = 'cpu-chart-{{ $this->getId() }}';
     const componentId = '{{ $this->getId() }}';
-    let chart   = null;
-    let pending = null; // { start, totalSum, coresSum, stolenSum, count }
+    const PRESET_MINUTES = { '5m': 5, '1h': 60, '24h': 1440 };
+    let chart  = null;
+    let poller = null;
 
-    function pad(n) { return String(n).padStart(2, '0'); }
+    function getRoot() { return document.querySelector('[wire\\:id="' + componentId + '"]'); }
 
-    function getRoot() {
-        return document.querySelector('[wire\\:id="' + componentId + '"]');
+    function getBucketMs() {
+        const sec = parseInt(getRoot()?.dataset.bucketSeconds || '1', 10);
+        return Math.max(1, sec) * 1000;
     }
 
-    function getConfig() {
-        const el = getRoot();
-        return {
-            bucketSeconds: parseInt(el?.dataset.bucketSeconds || '0', 10),
-            labelFormat:   el?.dataset.labelFormat || 'H:i:s',
-        };
-    }
-
-    function formatLabel(ts, fmt) {
-        const d = new Date(ts * 1000);
-        switch (fmt) {
-            case 'H:i:s':   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-            case 'H:i':     return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-            case 'M j':     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            case 'M j H:i': return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
-            default:        return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-        }
-    }
-
-    function isLive() {
+    function getTimeRange() {
         const picker = document.querySelector('[data-live]');
-        return picker?.dataset.live === '1';
+        const live   = picker?.dataset.live === '1';
+        const preset = picker?.dataset.preset;
+        if (live && PRESET_MINUTES[preset]) {
+            const to   = Math.floor(Date.now() / 1000);
+            const from = to - PRESET_MINUTES[preset] * 60;
+            return { from, to };
+        }
+        const root = getRoot();
+        return {
+            from: parseInt(root?.dataset.fromTs || '0', 10),
+            to:   parseInt(root?.dataset.toTs   || '0', 10),
+        };
     }
 
     function setText(selector, text) {
@@ -151,7 +147,6 @@
         const badge  = getRoot()?.querySelector('[data-cpu-status]');
         const dot    = getRoot()?.querySelector('[data-cpu-status-dot]');
         const label  = getRoot()?.querySelector('[data-cpu-status-label]');
-
         if (badge) {
             Object.values(STATUS_BADGE).forEach(cls => badge.classList.remove(...cls.split(' ')));
             badge.classList.add(...STATUS_BADGE[status].split(' '));
@@ -163,30 +158,25 @@
         if (label) label.textContent = status;
     }
 
-    function updateCards(total, coresAvg, stolen) {
-        setText('[data-cpu-total]',         total);
-        setText('[data-cpu-cores-avg]',     coresAvg);
-        setText('[data-cpu-stolen]',        stolen);
-        setText('[data-cpu-total-legend]',  total);
-        setText('[data-cpu-cores-legend]',  coresAvg);
-        setText('[data-cpu-stolen-legend]', stolen);
-        updateStatus(total);
+    function updateCards(d) {
+        setText('[data-cpu-total]',         d.totalUsage);
+        setText('[data-cpu-cores-avg]',     d.coresAvg);
+        setText('[data-cpu-stolen]',        d.stolenUsage);
+        setText('[data-cpu-cores]',         d.coreCount);
+        setText('[data-cpu-total-legend]',  d.totalUsage);
+        setText('[data-cpu-cores-legend]',  d.coresAvg);
+        setText('[data-cpu-stolen-legend]', d.stolenUsage);
+        setText('[data-cpu-period]',        d.periodLabel);
+        updateStatus(d.totalUsage);
     }
 
-    function shiftAndPush(label, totalVal, coresVal, stolenVal) {
-        chart.data.labels.shift();
-        chart.data.labels.push(label);
-        chart.data.datasets[0].data.shift();
-        chart.data.datasets[0].data.push(totalVal);
-        chart.data.datasets[1].data.shift();
-        chart.data.datasets[1].data.push(coresVal);
-        chart.data.datasets[2].data.shift();
-        chart.data.datasets[2].data.push(stolenVal);
+    function applyChartData(c) {
+        if (!chart || !c) return;
+        chart.data.labels           = c.labels;
+        chart.data.datasets[0].data = c.total;
+        chart.data.datasets[1].data = c.coresAvg;
+        chart.data.datasets[2].data = c.stolen;
         chart.update('none');
-
-        const first = chart.data.labels[0];
-        const last  = chart.data.labels[chart.data.labels.length - 1];
-        setText('[data-cpu-period]', `${first} – ${last}`);
     }
 
     function buildChart() {
@@ -200,42 +190,9 @@
             data: {
                 labels: data.labels,
                 datasets: [
-                    {
-                        label: 'total',
-                        data: data.total,
-                        borderColor: 'rgb(34, 211, 238)',
-                        backgroundColor: 'rgba(34, 211, 238, 0.10)',
-                        borderWidth: 1.8,
-                        pointRadius: 0,
-                        fill: true,
-                        tension: 0.4,
-                        spanGaps: true,
-                        order: 1,
-                    },
-                    {
-                        label: 'cores avg',
-                        data: data.coresAvg,
-                        borderColor: 'rgba(156, 163, 175, 0.45)',
-                        backgroundColor: 'rgba(0, 0, 0, 0)',
-                        borderWidth: 1,
-                        pointRadius: 0,
-                        fill: false,
-                        tension: 0.4,
-                        spanGaps: true,
-                        order: 2,
-                    },
-                    {
-                        label: 'stolen',
-                        data: data.stolen,
-                        borderColor: 'rgb(248, 113, 113)',
-                        backgroundColor: 'rgba(248, 113, 113, 0.08)',
-                        borderWidth: 1.5,
-                        pointRadius: 0,
-                        fill: true,
-                        tension: 0.4,
-                        spanGaps: true,
-                        order: 3,
-                    }
+                    { label: 'total',     data: data.total,    borderColor: 'rgb(34, 211, 238)',       backgroundColor: 'rgba(34, 211, 238, 0.10)', borderWidth: 1.8, pointRadius: 0, fill: true,  tension: 0.4, spanGaps: true, order: 1 },
+                    { label: 'cores avg', data: data.coresAvg, borderColor: 'rgba(156, 163, 175, 0.45)', backgroundColor: 'rgba(0, 0, 0, 0)',         borderWidth: 1,   pointRadius: 0, fill: false, tension: 0.4, spanGaps: true, order: 2 },
+                    { label: 'stolen',    data: data.stolen,   borderColor: 'rgb(248, 113, 113)',      backgroundColor: 'rgba(248, 113, 113, 0.08)',borderWidth: 1.5, pointRadius: 0, fill: true,  tension: 0.4, spanGaps: true, order: 3 }
                 ]
             },
             options: {
@@ -246,31 +203,15 @@
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: '#1a1a1a',
-                        borderColor: '#3a3a3a',
-                        borderWidth: 1,
-                        titleColor: '#e5e7eb',
-                        bodyColor: '#9ca3af',
-                        titleFont: { family: 'monospace', size: 11 },
-                        bodyFont:  { family: 'monospace', size: 11 },
-                        callbacks: {
-                            label: ctx => ' ' + ctx.dataset.label + ': ' + ctx.parsed.y + '%'
-                        }
+                        backgroundColor: '#1a1a1a', borderColor: '#3a3a3a', borderWidth: 1,
+                        titleColor: '#e5e7eb', bodyColor: '#9ca3af',
+                        titleFont: { family: 'monospace', size: 11 }, bodyFont: { family: 'monospace', size: 11 },
+                        callbacks: { label: ctx => ' ' + ctx.dataset.label + ': ' + ctx.parsed.y + '%' }
                     }
                 },
                 scales: {
-                    x: {
-                        ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 }, maxTicksLimit: 8 },
-                        grid:  { color: 'rgba(255,255,255,0.04)' },
-                        border: { color: '#2a2a2a' },
-                    },
-                    y: {
-                        ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 } },
-                        grid:  { color: 'rgba(255,255,255,0.04)' },
-                        border: { color: '#2a2a2a' },
-                        beginAtZero: true,
-                        suggestedMax: 100,
-                    }
+                    x: { ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 }, maxTicksLimit: 8 }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#2a2a2a' } },
+                    y: { ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#2a2a2a' }, beginAtZero: true, suggestedMax: 100 }
                 }
             }
         });
@@ -278,50 +219,24 @@
 
     buildChart();
 
-    function onEvent(e) {
-        if (e.type !== 'cpu') return;
-        if (!isLive()) return;
-
-        const { bucketSeconds, labelFormat } = getConfig();
-        if (bucketSeconds <= 0) return;
-
-        const ts       = e.collectedAt;
-        const total    = e.payload.total_usage;
-        const cores    = e.payload.per_core_usage || [];
-        const stolen   = e.payload.stolen_usage;
-        const coresAvg = cores.length > 0
-            ? Math.round(cores.reduce((a,b) => a+b, 0) / cores.length * 10) / 10
-            : 0;
-
-        updateCards(total, coresAvg, stolen);
-
-        const bucketStart = Math.floor(ts / bucketSeconds) * bucketSeconds;
-        if (pending && pending.start !== bucketStart) {
-            shiftAndPush(
-                formatLabel(pending.start, labelFormat),
-                Math.round(pending.totalSum  / pending.count * 100) / 100,
-                Math.round(pending.coresSum  / pending.count * 100) / 100,
-                Math.round(pending.stolenSum / pending.count * 100) / 100
-            );
-            pending = null;
-        }
-        if (!pending) {
-            pending = { start: bucketStart, totalSum: 0, coresSum: 0, stolenSum: 0, count: 0 };
-        }
-        pending.totalSum  += total;
-        pending.coresSum  += coresAvg;
-        pending.stolenSum += stolen;
-        pending.count     += 1;
-    }
-
-    if (window.Echo) {
-        window.Echo.channel('metrics').listen('.MetricCollected', onEvent);
-    }
+    poller = window.createPoller({
+        getUrl: () => {
+            const { from, to } = getTimeRange();
+            if (!from || !to) return null;
+            return `/poll/metrics?type=cpu&from=${from}&to=${to}`;
+        },
+        intervalMs: getBucketMs(),
+        onData: (d) => {
+            updateCards(d);
+            applyChartData(d.chartData);
+        },
+    });
+    poller.start();
 
     Livewire.hook('morph.updated', ({ component }) => {
         if (component.name === 'cpu-metrics') {
             buildChart();
-            pending = null;
+            poller.setInterval(getBucketMs());
         }
     });
 })();

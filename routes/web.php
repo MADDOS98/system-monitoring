@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Poll\ApacheLogsController as PollApacheLogsController;
+use App\Http\Controllers\Poll\MetricsController as PollMetricsController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ApacheLogController;
 
@@ -26,6 +28,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+});
+
+// Polling endpoints (JSON) — apelate de poller.js la interval = bucketSeconds.
+Route::middleware(['auth'])->prefix('poll')->group(function () {
+    Route::get('/metrics',     [PollMetricsController::class,    'snapshot'])->name('poll.metrics');
+    Route::get('/apache-logs', [PollApacheLogsController::class, 'snapshot'])->name('poll.apache-logs');
 });
 
 require __DIR__ . '/auth.php';
