@@ -172,34 +172,38 @@
 
 </div>
 
-    {{-- Pagination --}}
-    @if ($logs->hasPages())
-    <div class="px-4 py-3 border-t border-border bg-sidebar flex items-center justify-between">
+    {{-- Pagination — randata mereu; butoanele sunt dezactivate vizual cand nu sunt necesare. --}}
+    @php
+        $isFirst   = $logs->onFirstPage();
+        $isLast    = ! $logs->hasMorePages();
+        $disabledClasses = 'text-[#6b7280] opacity-30 cursor-not-allowed pointer-events-none';
+        $enabledClasses  = 'text-label hover:text-text';
+    @endphp
+    <div data-pagination class="px-4 py-3 border-t border-border bg-sidebar flex items-center justify-between">
 
-        @if ($logs->onFirstPage())
-        <span class="px-3 py-1.5 bg-panel border border-border rounded text-xs font-mono text-[#6b7280] opacity-30 cursor-not-allowed">← Newer</span>
-        @else
-        <button wire:click="previousPage" wire:loading.attr="disabled"
-            class="px-3 py-1.5 bg-panel border border-border rounded text-xs font-mono text-label hover:text-text transition-colors duration-150">
+        <button
+            data-prev-button
+            wire:click="previousPage"
+            wire:loading.attr="disabled"
+            @if($isFirst) disabled @endif
+            class="px-3 py-1.5 bg-panel border border-border rounded text-xs font-mono transition-colors duration-150 {{ $isFirst ? $disabledClasses : $enabledClasses }}">
             ← Newer
         </button>
-        @endif
 
-        <span class="text-xs font-mono text-[#6b7280]">
-            {{ $logs->firstItem() }}–{{ $logs->lastItem() }} of {{ $logs->total() }}
+        <span data-pagination-summary class="text-xs font-mono text-[#6b7280]">
+            {{ $logs->firstItem() ?? 0 }}–{{ $logs->lastItem() ?? 0 }} of {{ $logs->total() }}
         </span>
 
-        @if ($logs->hasMorePages())
-        <button wire:click="nextPage" wire:loading.attr="disabled"
-            class="px-3 py-1.5 bg-panel border border-border rounded text-xs font-mono text-label hover:text-text transition-colors duration-150">
+        <button
+            data-next-button
+            wire:click="nextPage"
+            wire:loading.attr="disabled"
+            @if($isLast) disabled @endif
+            class="px-3 py-1.5 bg-panel border border-border rounded text-xs font-mono transition-colors duration-150 {{ $isLast ? $disabledClasses : $enabledClasses }}">
             Older →
         </button>
-        @else
-        <span class="px-3 py-1.5 bg-panel border border-border rounded text-xs font-mono text-[#6b7280] opacity-30 cursor-not-allowed">Older →</span>
-        @endif
 
     </div>
-    @endif
 
 @script
 <script>
@@ -381,6 +385,39 @@
         document.dispatchEvent(new CustomEvent('apache-logs-poll', { detail: payload }));
     }
 
+    const DISABLED_CLS = ['text-[#6b7280]', 'opacity-30', 'cursor-not-allowed', 'pointer-events-none'];
+    const ENABLED_CLS  = ['text-label', 'hover:text-text'];
+
+    function setButtonDisabled(btn, disabled) {
+        if (!btn) return;
+        btn.disabled = disabled;
+        if (disabled) {
+            ENABLED_CLS.forEach(c => btn.classList.remove(c));
+            DISABLED_CLS.forEach(c => btn.classList.add(c));
+        } else {
+            DISABLED_CLS.forEach(c => btn.classList.remove(c));
+            ENABLED_CLS.forEach(c => btn.classList.add(c));
+        }
+    }
+
+    function updatePagination(logs) {
+        if (!logs) return;
+        const root = getRoot();
+        if (!root) return;
+
+        const summary = root.querySelector('[data-pagination-summary]');
+        if (summary) {
+            const from = logs.from ?? 0;
+            const to   = logs.to   ?? 0;
+            summary.textContent = `${from}–${to} of ${Number(logs.total || 0).toLocaleString()}`;
+        }
+
+        const page     = parseInt(logs.page      || 1, 10);
+        const lastPage = parseInt(logs.last_page || 1, 10);
+        setButtonDisabled(root.querySelector('[data-prev-button]'), page <= 1);
+        setButtonDisabled(root.querySelector('[data-next-button]'), page >= lastPage);
+    }
+
     function onData(d) {
         const newRows = d.new_logs?.rows || [];
         if (newRows.length > 0) {
@@ -396,6 +433,7 @@
             lastSeenId = maxId;
         }
 
+        updatePagination(d.logs);
         distributeToSiblings(d);
     }
 
