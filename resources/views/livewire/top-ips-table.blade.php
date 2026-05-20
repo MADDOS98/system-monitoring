@@ -9,9 +9,11 @@
             }
         }
     }"
+    data-component="top-ips"
+    data-tab="{{ $this->tab }}"
     data-bucket-seconds="{{ $bucketSeconds }}"
     class="rounded-lg border border-border overflow-hidden flex flex-col"
-    style="height: calc(12 * 53px)">
+    style="height: calc(16 * 54px)">
 
     {{-- Header --}}
     <div class="flex items-center justify-between px-4 py-2.5 bg-sidebar border-b border-border flex-shrink-0">

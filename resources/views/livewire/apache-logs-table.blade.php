@@ -363,17 +363,20 @@
         const empty = tbody.querySelector('[data-empty-row]');
         if (empty) empty.remove();
 
-        // Rândurile vin DESC (cele mai noi primele). Le inserăm în ordinea aceasta la top.
+        // Randurile vin DESC (cele mai noi primele). Capturam anchor-ul existent
+        // O SINGURA DATA inainte de loop si inseram inaintea lui in ordinea primita,
+        // ca sa pastram ordonarea cronologica corecta (newest -> top).
         const { pageSize } = getState();
+        const anchor = tbody.firstChild;
         for (const r of rows) {
             if (tbody.querySelector(`[data-log-id="${CSS.escape(String(r.id))}"]`)) continue;
             const tmp = document.createElement('tbody');
             tmp.innerHTML = buildRowHtml(r).trim();
             const newRow = tmp.firstElementChild;
-            if (newRow) tbody.insertBefore(newRow, tbody.firstChild);
+            if (newRow) tbody.insertBefore(newRow, anchor);
         }
 
-        // Taie ultimele dacă am depășit page size.
+        // Taie ultimele daca am depasit page size.
         let rowsNow = tbody.querySelectorAll('tr[data-log-id]');
         while (rowsNow.length > pageSize) {
             tbody.lastElementChild.remove();
@@ -442,13 +445,14 @@
             const { from, to }  = getTimeRange();
             if (!from || !to) return null;
             const s = getState();
+            const topIpsTab = document.querySelector('[data-component="top-ips"]')?.dataset.tab || 'All';
             const qs = new URLSearchParams({
                 from: String(from),
                 to:   String(to),
                 page: String(s.currentPage),
                 search:       s.searchQuery,
                 search_field: s.searchField,
-                tab:          'All',
+                tab:          topIpsTab,
                 since_id:     String(lastSeenId),
             }).toString();
             return `/poll/apache-logs?${qs}`;
@@ -459,11 +463,19 @@
     poller.start();
 
     Livewire.hook('morph.updated', ({ component }) => {
-        if (component.id !== componentId) return;
-        refreshLastSeenIdFromDom();
-        resetBanner();
-        bindBannerClick();
-        poller.setInterval(getBucketMs());
+        if (component.id === componentId) {
+            refreshLastSeenIdFromDom();
+            resetBanner();
+            bindBannerClick();
+            poller.setInterval(getBucketMs());
+            return;
+        }
+        // Schimbare tab in top-ips-table → abort poll curent (potential cu tab vechi)
+        // si porneste unul nou imediat cu data-tab actualizat.
+        if (component.name === 'top-ips-table') {
+            poller.stop();
+            poller.start();
+        }
     });
 
     bindBannerClick();
