@@ -55,6 +55,17 @@ return [
             'transaction_mode' => 'DEFERRED',
         ],
 
+        'apache_logs' => [
+            'driver' => 'sqlite',
+            'database' => env('DB_APACHE_LOGS_DATABASE', database_path('apache_logs.sqlite')),
+            'prefix' => '',
+            'foreign_key_constraints' => true,
+            'busy_timeout' => null,
+            'journal_mode' => null,
+            'synchronous' => null,
+            'transaction_mode' => 'DEFERRED',
+        ],
+
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DB_URL'),

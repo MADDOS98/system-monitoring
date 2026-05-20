@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class HostReputation extends Model
 {
+    protected $connection = 'apache_logs';
+
     public $timestamps = false;
 
     protected $fillable = [

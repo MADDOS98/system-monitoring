@@ -3,6 +3,7 @@ composer install
 @php artisan key:generate
 @php artisan migrate --force
 @php artisan migrate --force --path=database/migrations/system_metrics --database=system_metrics
+@php artisan migrate --force --path=database/migrations/apache_logs --database=apache_logs
 npm install
 npm run build
 

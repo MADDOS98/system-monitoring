@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class ApacheLog extends Model
 {
+    protected $connection = 'apache_logs';
+
     protected $table = 'apache_logs';
 
     public $timestamps = false;

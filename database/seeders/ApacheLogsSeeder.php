@@ -75,7 +75,7 @@ class ApacheLogsSeeder extends Seeder
                 ];
             }
 
-            DB::table('apache_logs')->insert($rows);
+            DB::connection('apache_logs')->table('apache_logs')->insert($rows);
         }
     }
 
