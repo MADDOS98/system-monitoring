@@ -98,7 +98,7 @@
 
         <tbody data-logs-tbody class="divide-y divide-[#2a2a2a]">
             @forelse ($logs as $log)
-            <tr data-log-id="{{ $log->id }}" class="bg-[#111111] hover:bg-[#161616] transition-colors duration-100">
+            <tr data-log-id="{{ $log->id }}" class="bg-[#111111] hover:bg-[#161616] transition-[background-color] duration-100">
 
                 <td class="px-4 py-2.5 text-[#6b7280] whitespace-nowrap">
                     {{ isset($log->log_time) ? date('H:i:s', $log->log_time) : '—' }}
@@ -312,7 +312,7 @@
         const ip     = e.remote_host || '—';
         const ua     = e.user_agent || '';
         return `
-            <tr data-log-id="${escapeHtml(e.id)}" class="bg-[#111111] hover:bg-[#161616] transition-colors duration-100">
+            <tr data-log-id="${escapeHtml(e.id)}" class="bg-[#111111] hover:bg-[#161616] transition-[background-color] duration-100">
                 <td class="px-4 py-2.5 text-[#6b7280] whitespace-nowrap">${escapeHtml(time)}</td>
                 <td class="px-4 py-2.5 whitespace-nowrap">
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold ${methodClasses(method)}">${escapeHtml(method)}</span>
