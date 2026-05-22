@@ -1,3 +1,7 @@
+@php
+    $activeAlertsCount = \App\Models\Alert::whereNull('read_at')->count();
+@endphp
+
 <aside class="w-52 flex-shrink-0 bg-sidebar border-r border-border flex flex-col justify-between py-4 fixed top-0 left-0 h-full z-20">
 
     <div>
@@ -78,10 +82,11 @@
                     <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                 </svg>
                 Alerts
-                {{-- Badge dinamic - placeholder pana la integrare cu sistemul de alerte --}}
-                <span class="ml-auto bg-red-700 text-white text-[10px] font-semibold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1">
-                    4
-                </span>
+                @if($activeAlertsCount > 0)
+                    <span class="ml-auto bg-red-700 text-white text-[10px] font-semibold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1">
+                        {{ $activeAlertsCount }}
+                    </span>
+                @endif
             </a>
         </nav>
     </div>
