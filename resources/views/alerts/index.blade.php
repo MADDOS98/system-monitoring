@@ -20,4 +20,6 @@
 
     <livewire:alerts-list />
 
+    <livewire:alert-rules-manager />
+
 </x-app-layout>
