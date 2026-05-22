@@ -19,6 +19,17 @@
 Realtime-ul foloseste HTTP polling adaptiv (intervalul = bucket-ul ferestrei de timp curente,
 de la 1s la 1 zi). Nu mai e nevoie de reverb / websocket server separat.
 
+### Alerte (sliding-window evaluator)
+- php artisan schedule:work
+
+Ruleaza intr-un terminal separat. Lanseaza `alerts:evaluate` la fiecare 30 min — scaneaza
+intervalul `[last_evaluated_at, now]` cu ferestre glisante non-overlapping si genereaza
+alerte cand `count(samples care respecta conditia) / total >= ratio` din regulile active.
+Regulile grupate dupa (metric, operator) se evalueaza in ordine critical -> warning -> info,
+cu suprimarea nivelurilor inferioare odata ce unul mai sever a declansat in fereastra curenta.
+
+Pentru o rulare imediata fara scheduler: `php artisan alerts:evaluate`.
+
 
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
