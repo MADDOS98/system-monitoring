@@ -51,23 +51,12 @@ class AlertsList extends Component
 
     public function render()
     {
-        // Base query scoped to current Active/Read tab.
+        // Base scope: tab + metric + search. Level filter is applied last so the
+        // level badges (and the "All" badge) reflect counts under the OTHER active
+        // filters — e.g. picking metric=cpu narrows the per-level numbers to cpu.
         $base = Alert::query()
             ->when($this->tab === 'active', fn ($q) => $q->whereNull('read_at'))
-            ->when($this->tab === 'read',   fn ($q) => $q->whereNotNull('read_at'));
-
-        // Per-level counts within the current tab — used for the filter badges.
-        $levelCounts = (clone $base)
-            ->selectRaw('level, COUNT(*) AS c')
-            ->groupBy('level')
-            ->pluck('c', 'level');
-
-        $tabTotal = (clone $base)->count();
-
-        // Apply user filters (level, metric, search).
-        $alerts = (clone $base)
-            ->with('rule')
-            ->when($this->levelFilter !== 'all',  fn ($q) => $q->where('level',  $this->levelFilter))
+            ->when($this->tab === 'read',   fn ($q) => $q->whereNotNull('read_at'))
             ->when($this->metricFilter !== 'all', fn ($q) => $q->where('metric', $this->metricFilter))
             ->when(trim($this->search) !== '', function ($q) {
                 $term = '%' . trim($this->search) . '%';
@@ -75,10 +64,23 @@ class AlertsList extends Component
                     $q->where('message', 'LIKE', $term)
                       ->orWhereHas('rule', fn ($q2) => $q2->where('name', 'LIKE', $term));
                 });
-            })
+            });
+
+        $levelCounts = (clone $base)
+            ->selectRaw('level, COUNT(*) AS c')
+            ->groupBy('level')
+            ->pluck('c', 'level');
+
+        $tabTotal = (clone $base)->count();
+
+        $alerts = (clone $base)
+            ->with('rule')
+            ->when($this->levelFilter !== 'all', fn ($q) => $q->where('level', $this->levelFilter))
             ->orderByDesc('id')
             ->get();
 
+        // Active/Read tab badges stay global (independent of metric/search) so
+        // the user can still see how many alerts exist in the other tab.
         $activeCount = Alert::whereNull('read_at')->count();
         $readCount   = Alert::whereNotNull('read_at')->count();
 
