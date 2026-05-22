@@ -24,6 +24,10 @@ Route::get('/metrics', function (\Illuminate\Http\Request $request) {
     return view('metrics.index', compact('tab'));
 })->middleware(['auth', 'verified'])->name('metrics');
 
+Route::get('/alerts', fn() => view('alerts.index'))
+    ->middleware(['auth', 'verified'])
+    ->name('alerts');
+
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

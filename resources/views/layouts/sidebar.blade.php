@@ -70,7 +70,7 @@
                 </svg>
                 Storage
             </a>
-            <a href="#"
+            <a href="{{ route('alerts') }}" wire:navigate
                class="flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150
                       {{ request()->routeIs('alerts*') ? 'bg-panel text-text' : 'text-label hover:bg-panel hover:text-text' }}">
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
@@ -78,8 +78,8 @@
                     <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                 </svg>
                 Alerts
-                {{-- Badge dinamic - va fi înlocuit cu date reale --}}
-                <span class="ml-auto bg-danger text-white text-[10px] font-semibold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1">
+                {{-- Badge dinamic - placeholder pana la integrare cu sistemul de alerte --}}
+                <span class="ml-auto bg-red-700 text-white text-[10px] font-semibold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1">
                     4
                 </span>
             </a>
