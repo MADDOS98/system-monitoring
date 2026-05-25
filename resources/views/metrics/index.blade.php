@@ -31,12 +31,18 @@
             </nav>
         </div>
 
+        {{-- Alerts per Tab --}}
+        <livewire:tab-alerts :tab="$tab" :key="'tab-alerts-' . $tab" />
+
+        {{-- Tab Content --}}
         @switch($tab)
             @case('cpu')     <livewire:cpu-metrics />     @break
             @case('ram')     <livewire:ram-metrics />     @break
             @case('network') <livewire:network-metrics /> @break
             @case('disk')    <livewire:disk-metrics />    @break
         @endswitch
+
+        
 
     </div>
 
