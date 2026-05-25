@@ -6,9 +6,12 @@ use App\Models\ApacheLog;
 use App\Models\HostReputation;
 use Carbon\Carbon;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 
 class ApacheLogsQuery
 {
+    private const CONNECTION = 'apache_logs';
+
     /**
      * Pagina principala (folosita la initial render Livewire si la fallback poll
      * cand user e pe page 2+ / cu search).
@@ -21,7 +24,7 @@ class ApacheLogsQuery
         string $searchField,
         int $perPage = 20
     ): LengthAwarePaginator {
-        return ApacheLog::query()
+        return DB::connection(self::CONNECTION)->table('apache_logs')
             ->when($fromTs, fn($q) => $q->where('log_time', '>=', $fromTs))
             ->when($toTs,   fn($q) => $q->where('log_time', '<=', $toTs))
             ->when($searchQuery !== '', function ($q) use ($searchQuery, $searchField) {
@@ -55,7 +58,7 @@ class ApacheLogsQuery
             return [];
         }
 
-        return ApacheLog::query()
+        return DB::connection(self::CONNECTION)->table('apache_logs')
             ->where('id', '>', $sinceId)
             ->orderByDesc('id')
             ->limit($limit)
@@ -78,9 +81,12 @@ class ApacheLogsQuery
      */
     public function topIps(int $fromTs, int $toTs, string $tab = 'All', int $limit = 15): array
     {
-        $reputationsByIp = HostReputation::all()->keyBy('ip');
+        $reputationsByIp = DB::connection(self::CONNECTION)
+            ->table('host_reputations')
+            ->get(['ip', 'host', 'status'])
+            ->keyBy('ip');
 
-        return ApacheLog::query()
+        return DB::connection(self::CONNECTION)->table('apache_logs')
             ->when($fromTs, fn($q) => $q->where('log_time', '>=', $fromTs))
             ->when($toTs,   fn($q) => $q->where('log_time', '<=', $toTs))
             ->selectRaw('
@@ -103,9 +109,9 @@ class ApacheLogsQuery
 
                 $tag = null; $host = null; $status = null;
                 if ($rep) {
-                    $status = $rep->status;
+                    $status = (int) $rep->status;
                     $host   = $rep->host;
-                    $tag    = match ($rep->status) {
+                    $tag    = match ($status) {
                         HostReputation::STATUS_TRUSTED => 'TRUSTED',
                         HostReputation::STATUS_WARNING => 'WARNING',
                         HostReputation::STATUS_DANGER  => 'DANGER',
@@ -143,7 +149,7 @@ class ApacheLogsQuery
      */
     public function byStatus(int $fromTs, int $toTs): array
     {
-        $rows = ApacheLog::query()
+        $rows = DB::connection(self::CONNECTION)->table('apache_logs')
             ->when($fromTs, fn($q) => $q->where('log_time', '>=', $fromTs))
             ->when($toTs,   fn($q) => $q->where('log_time', '<=', $toTs))
             ->selectRaw('
