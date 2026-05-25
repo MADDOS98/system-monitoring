@@ -4,6 +4,7 @@ namespace App\Services\Monitoring;
 
 use App\Models\RamMetric;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class RamMetricsQuery
 {
@@ -52,35 +53,28 @@ class RamMetricsQuery
 
         $bucketCount = (int) ceil($diffSeconds / $bucketSeconds);
 
-        $rows = RamMetric::whereBetween('collected_at', [$fromTs, $toTs])
-            ->orderBy('collected_at')
-            ->get(['collected_at', 'used_kb']);
-
-        $buckets = [];
-        for ($i = 0; $i < $bucketCount; $i++) {
-            $buckets[$i] = [
-                'sum'   => 0,
-                'count' => 0,
-                'ts'    => $fromTs + $i * $bucketSeconds,
-            ];
-        }
-
-        foreach ($rows as $row) {
-            $offset = $row->collected_at - $fromTs;
-            $key    = (int) floor($offset / $bucketSeconds);
-            if (!isset($buckets[$key])) {
-                continue;
-            }
-            $buckets[$key]['sum']   += $row->used_kb;
-            $buckets[$key]['count'] += 1;
-        }
+        // Bucketize in SQL: same formula as the previous PHP loop —
+        // bucket_ts = floor((collected_at - fromTs) / bucketSec) * bucketSec + fromTs.
+        $bucketRows = DB::connection('system_metrics')
+            ->table('ram_metrics')
+            ->selectRaw(
+                '((collected_at - ?) / ?) * ? + ? AS bucket_ts, AVG(used_kb) AS avg_used_kb',
+                [$fromTs, $bucketSeconds, $bucketSeconds, $fromTs]
+            )
+            ->whereBetween('collected_at', [$fromTs, $toTs])
+            ->groupBy('bucket_ts')
+            ->get()
+            ->keyBy('bucket_ts');
 
         $labels = [];
         $values = [];
-        foreach ($buckets as $b) {
-            $labels[] = Carbon::createFromTimestamp($b['ts'], $tz)->format($labelFormat);
-            $values[] = $b['count'] > 0
-                ? round($b['sum'] / $b['count'] / (1024 * 1024), 2)
+        for ($i = 0; $i < $bucketCount; $i++) {
+            $ts  = $fromTs + $i * $bucketSeconds;
+            $row = $bucketRows->get($ts);
+
+            $labels[] = Carbon::createFromTimestamp($ts, $tz)->format($labelFormat);
+            $values[] = $row !== null
+                ? round($row->avg_used_kb / (1024 * 1024), 2)
                 : 0;
         }
 

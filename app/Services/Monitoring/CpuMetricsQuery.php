@@ -4,6 +4,7 @@ namespace App\Services\Monitoring;
 
 use App\Models\CpuMetric;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class CpuMetricsQuery
 {
@@ -53,46 +54,36 @@ class CpuMetricsQuery
 
         $bucketCount = (int) ceil($diffSeconds / $bucketSeconds);
 
-        $rows = CpuMetric::whereBetween('collected_at', [$fromTs, $toTs])
-            ->orderBy('collected_at')
-            ->get(['collected_at', 'total_usage', 'per_core_usage', 'stolen_usage']);
-
-        $buckets = [];
-        for ($i = 0; $i < $bucketCount; $i++) {
-            $buckets[$i] = [
-                'totalSum'    => 0,
-                'coresAvgSum' => 0,
-                'stolenSum'   => 0,
-                'count'       => 0,
-                'ts'          => $fromTs + $i * $bucketSeconds,
-            ];
-        }
-
-        foreach ($rows as $row) {
-            $offset = $row->collected_at - $fromTs;
-            $key    = (int) floor($offset / $bucketSeconds);
-            if (!isset($buckets[$key])) {
-                continue;
-            }
-            $cores    = $row->per_core_usage;
-            $coresAvg = !empty($cores) ? array_sum($cores) / count($cores) : 0;
-
-            $buckets[$key]['totalSum']    += $row->total_usage;
-            $buckets[$key]['coresAvgSum'] += $coresAvg;
-            $buckets[$key]['stolenSum']   += $row->stolen_usage;
-            $buckets[$key]['count']       += 1;
-        }
+        // For coresAvg we need the per-row mean of the per_core_usage JSON array.
+        // The correlated subquery `(SELECT AVG(value) FROM json_each(per_core_usage))`
+        // unpacks the JSON per row and averages its elements, regardless of core count.
+        $bucketRows = DB::connection('system_metrics')
+            ->table('cpu_metrics')
+            ->selectRaw(
+                '((collected_at - ?) / ?) * ? + ? AS bucket_ts,
+                 AVG(total_usage)  AS avg_total,
+                 AVG(stolen_usage) AS avg_stolen,
+                 AVG((SELECT AVG(value) FROM json_each(per_core_usage))) AS avg_cores',
+                [$fromTs, $bucketSeconds, $bucketSeconds, $fromTs]
+            )
+            ->whereBetween('collected_at', [$fromTs, $toTs])
+            ->groupBy('bucket_ts')
+            ->get()
+            ->keyBy('bucket_ts');
 
         $labels   = [];
         $total    = [];
         $coresAvg = [];
         $stolen   = [];
-        foreach ($buckets as $b) {
-            $labels[] = Carbon::createFromTimestamp($b['ts'], $tz)->format($labelFormat);
-            if ($b['count'] > 0) {
-                $total[]    = round($b['totalSum']    / $b['count'], 2);
-                $coresAvg[] = round($b['coresAvgSum'] / $b['count'], 2);
-                $stolen[]   = round($b['stolenSum']   / $b['count'], 2);
+        for ($i = 0; $i < $bucketCount; $i++) {
+            $ts  = $fromTs + $i * $bucketSeconds;
+            $row = $bucketRows->get($ts);
+
+            $labels[] = Carbon::createFromTimestamp($ts, $tz)->format($labelFormat);
+            if ($row !== null) {
+                $total[]    = round($row->avg_total,  2);
+                $coresAvg[] = round($row->avg_cores,  2);
+                $stolen[]   = round($row->avg_stolen, 2);
             } else {
                 $total[]    = 0;
                 $coresAvg[] = 0;

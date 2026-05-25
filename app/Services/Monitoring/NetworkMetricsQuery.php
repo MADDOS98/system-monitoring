@@ -5,6 +5,7 @@ namespace App\Services\Monitoring;
 use App\Models\ConnectionMetric;
 use App\Models\NetworkMetric;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class NetworkMetricsQuery
 {
@@ -97,39 +98,28 @@ class NetworkMetricsQuery
 
         $bucketCount = (int) ceil($diffSeconds / $bucketSeconds);
 
-        $rows = NetworkMetric::whereBetween('collected_at', [$fromTs, $toTs])
-            ->orderBy('collected_at')
-            ->get(['collected_at', 'rx_bytes', 'tx_bytes']);
-
-        $buckets = [];
-        for ($i = 0; $i < $bucketCount; $i++) {
-            $buckets[$i] = [
-                'rxSum' => 0,
-                'txSum' => 0,
-                'count' => 0,
-                'ts'    => $fromTs + $i * $bucketSeconds,
-            ];
-        }
-
-        foreach ($rows as $row) {
-            $offset = $row->collected_at - $fromTs;
-            $key    = (int) floor($offset / $bucketSeconds);
-            if (!isset($buckets[$key])) {
-                continue;
-            }
-            $buckets[$key]['rxSum'] += $row->rx_bytes;
-            $buckets[$key]['txSum'] += $row->tx_bytes;
-            $buckets[$key]['count'] += 1;
-        }
+        $bucketRows = DB::connection('system_metrics')
+            ->table('network_metrics')
+            ->selectRaw(
+                '((collected_at - ?) / ?) * ? + ? AS bucket_ts, AVG(rx_bytes) AS avg_rx, AVG(tx_bytes) AS avg_tx',
+                [$fromTs, $bucketSeconds, $bucketSeconds, $fromTs]
+            )
+            ->whereBetween('collected_at', [$fromTs, $toTs])
+            ->groupBy('bucket_ts')
+            ->get()
+            ->keyBy('bucket_ts');
 
         $labels = [];
         $rx     = [];
         $tx     = [];
-        foreach ($buckets as $b) {
-            $labels[] = Carbon::createFromTimestamp($b['ts'], $tz)->format($labelFormat);
-            if ($b['count'] > 0) {
-                $rx[] = round(($b['rxSum'] / $b['count']) * 8 / 60 / 1_000_000, 2);
-                $tx[] = round(($b['txSum'] / $b['count']) * 8 / 60 / 1_000_000, 2);
+        for ($i = 0; $i < $bucketCount; $i++) {
+            $ts  = $fromTs + $i * $bucketSeconds;
+            $row = $bucketRows->get($ts);
+
+            $labels[] = Carbon::createFromTimestamp($ts, $tz)->format($labelFormat);
+            if ($row !== null) {
+                $rx[] = round($row->avg_rx * 8 / 60 / 1_000_000, 2);
+                $tx[] = round($row->avg_tx * 8 / 60 / 1_000_000, 2);
             } else {
                 $rx[] = 0;
                 $tx[] = 0;

@@ -5,6 +5,7 @@ namespace App\Services\Monitoring;
 use App\Models\DiskIoMetric;
 use App\Models\DiskUsageMetric;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class DiskMetricsQuery
 {
@@ -65,32 +66,26 @@ class DiskMetricsQuery
 
         $bucketCount = (int) ceil($diffSeconds / $bucketSeconds);
 
-        $rows = DiskIoMetric::whereBetween('collected_at', [$fromTs, $toTs])
-            ->orderBy('collected_at')
-            ->get(['collected_at', 'read_bytes', 'write_bytes']);
-
-        $buckets = [];
-        for ($i = 0; $i < $bucketCount; $i++) {
-            $buckets[$i] = ['readSum' => 0, 'writeSum' => 0, 'count' => 0, 'ts' => $fromTs + $i * $bucketSeconds];
-        }
-
-        foreach ($rows as $row) {
-            $offset = $row->collected_at - $fromTs;
-            $key    = (int) floor($offset / $bucketSeconds);
-            if (!isset($buckets[$key])) {
-                continue;
-            }
-            $buckets[$key]['readSum']  += $row->read_bytes;
-            $buckets[$key]['writeSum'] += $row->write_bytes;
-            $buckets[$key]['count']    += 1;
-        }
+        $bucketRows = DB::connection('system_metrics')
+            ->table('disk_io_metrics')
+            ->selectRaw(
+                '((collected_at - ?) / ?) * ? + ? AS bucket_ts, AVG(read_bytes) AS avg_read, AVG(write_bytes) AS avg_write',
+                [$fromTs, $bucketSeconds, $bucketSeconds, $fromTs]
+            )
+            ->whereBetween('collected_at', [$fromTs, $toTs])
+            ->groupBy('bucket_ts')
+            ->get()
+            ->keyBy('bucket_ts');
 
         $labels = []; $read = []; $write = [];
-        foreach ($buckets as $b) {
-            $labels[] = Carbon::createFromTimestamp($b['ts'], $tz)->format($labelFormat);
-            if ($b['count'] > 0) {
-                $read[]  = round(($b['readSum']  / $b['count']) / 60 / 1_000_000, 2);
-                $write[] = round(($b['writeSum'] / $b['count']) / 60 / 1_000_000, 2);
+        for ($i = 0; $i < $bucketCount; $i++) {
+            $ts  = $fromTs + $i * $bucketSeconds;
+            $row = $bucketRows->get($ts);
+
+            $labels[] = Carbon::createFromTimestamp($ts, $tz)->format($labelFormat);
+            if ($row !== null) {
+                $read[]  = round($row->avg_read  / 60 / 1_000_000, 2);
+                $write[] = round($row->avg_write / 60 / 1_000_000, 2);
             } else {
                 $read[]  = 0;
                 $write[] = 0;
@@ -111,30 +106,25 @@ class DiskMetricsQuery
 
         $bucketCount = (int) ceil($diffSeconds / $bucketSeconds);
 
-        $rows = DiskUsageMetric::whereBetween('collected_at', [$fromTs, $toTs])
-            ->orderBy('collected_at')
-            ->get(['collected_at', 'used_bytes']);
-
-        $buckets = [];
-        for ($i = 0; $i < $bucketCount; $i++) {
-            $buckets[$i] = ['sum' => 0, 'count' => 0, 'ts' => $fromTs + $i * $bucketSeconds];
-        }
-
-        foreach ($rows as $row) {
-            $offset = $row->collected_at - $fromTs;
-            $key    = (int) floor($offset / $bucketSeconds);
-            if (!isset($buckets[$key])) {
-                continue;
-            }
-            $buckets[$key]['sum']   += $row->used_bytes;
-            $buckets[$key]['count'] += 1;
-        }
+        $bucketRows = DB::connection('system_metrics')
+            ->table('disk_usage_metrics')
+            ->selectRaw(
+                '((collected_at - ?) / ?) * ? + ? AS bucket_ts, AVG(used_bytes) AS avg_used',
+                [$fromTs, $bucketSeconds, $bucketSeconds, $fromTs]
+            )
+            ->whereBetween('collected_at', [$fromTs, $toTs])
+            ->groupBy('bucket_ts')
+            ->get()
+            ->keyBy('bucket_ts');
 
         $labels = []; $values = [];
-        foreach ($buckets as $b) {
-            $labels[] = Carbon::createFromTimestamp($b['ts'], $tz)->format($labelFormat);
-            $values[] = $b['count'] > 0
-                ? round($b['sum'] / $b['count'] / (1024 * 1024 * 1024), 2)
+        for ($i = 0; $i < $bucketCount; $i++) {
+            $ts  = $fromTs + $i * $bucketSeconds;
+            $row = $bucketRows->get($ts);
+
+            $labels[] = Carbon::createFromTimestamp($ts, $tz)->format($labelFormat);
+            $values[] = $row !== null
+                ? round($row->avg_used / (1024 * 1024 * 1024), 2)
                 : 0;
         }
 
