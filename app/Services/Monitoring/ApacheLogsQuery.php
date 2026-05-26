@@ -178,15 +178,20 @@ class ApacheLogsQuery
 
     /**
      * 24 bin-uri orare pentru o anumita zi (peak traffic timeline).
+     *
+     * Ora e calculata ca offset fata de $dayStart (care e local midnight, in TZ
+     * userului) impartit la 3600. Asta da hour [0..23] corect aliniat la timezone-ul
+     * curent — strftime("%H", datetime(..., "unixepoch")) ar fi dat ora UTC, ceea ce
+     * shifta toata cronologia cu offsetul timezone fata de WHERE-ul deja localizat.
      */
     public function peakBins(string $day): array
     {
         $dayStart = Carbon::parse($day)->startOfDay()->timestamp;
         $dayEnd   = Carbon::parse($day)->endOfDay()->timestamp;
 
-        $rows = ApacheLog::query()
+        $rows = DB::connection(self::CONNECTION)->table('apache_logs')
             ->whereBetween('log_time', [$dayStart, $dayEnd])
-            ->selectRaw('CAST(strftime("%H", datetime(log_time, "unixepoch")) AS INTEGER) as hour, COUNT(*) as total')
+            ->selectRaw('CAST((log_time - ?) / 3600 AS INTEGER) as hour, COUNT(*) as total', [$dayStart])
             ->groupBy('hour')
             ->orderBy('hour')
             ->pluck('total', 'hour')
