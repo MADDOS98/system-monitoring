@@ -10,6 +10,13 @@ class MetricSampleFetcher
 {
     private const CONNECTION = 'system_metrics';
 
+    /**
+     * Returneaza sample-urile dintre [$from, $to) ca o colectie de obiecte
+     * stdClass cu campurile `ts` (int, unix sec) si `value` (float).
+     *
+     * Trebuie tinut minte timestamp-ul pe langa valoare pentru ca AlertEvaluator
+     * are nevoie de ele ca sa calculeze streak-ul de inactivitate (inactive_reset_sec).
+     */
     public function samples(string $metric, int $from, int $to): Collection
     {
         [$table, $valueExpr] = match ($metric) {
@@ -22,15 +29,17 @@ class MetricSampleFetcher
             default         => throw new InvalidArgumentException("Unknown metric: {$metric}"),
         };
 
-        $rows = DB::connection(self::CONNECTION)
+        return DB::connection(self::CONNECTION)
             ->table($table)
-            ->selectRaw("{$valueExpr} AS value")
+            ->selectRaw("collected_at AS ts, {$valueExpr} AS value")
             ->where('collected_at', '>=', $from)
             ->where('collected_at', '<',  $to)
             ->whereNotNull(DB::raw($valueExpr))
             ->orderBy('collected_at')
-            ->pluck('value');
-
-        return $rows->map(fn ($v) => (float) $v);
+            ->get()
+            ->map(fn ($r) => (object) [
+                'ts'    => (int)   $r->ts,
+                'value' => (float) $r->value,
+            ]);
     }
 }

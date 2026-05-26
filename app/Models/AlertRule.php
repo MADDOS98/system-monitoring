@@ -36,16 +36,18 @@ class AlertRule extends Model
         'level',
         'window_sec',
         'ratio',
+        'inactive_reset_sec',
         'is_active',
         'last_evaluated_at',
     ];
 
     protected $casts = [
-        'threshold'         => 'float',
-        'ratio'             => 'float',
-        'window_sec'        => 'integer',
-        'is_active'         => 'boolean',
-        'last_evaluated_at' => 'integer',
+        'threshold'          => 'float',
+        'ratio'              => 'float',
+        'window_sec'         => 'integer',
+        'inactive_reset_sec' => 'integer',
+        'is_active'          => 'boolean',
+        'last_evaluated_at'  => 'integer',
     ];
 
     public function alerts(): HasMany

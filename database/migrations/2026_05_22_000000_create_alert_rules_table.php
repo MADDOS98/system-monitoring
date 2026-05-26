@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('level', 10);
             $table->integer('window_sec');
             $table->float('ratio');
+            $table->integer('inactive_reset_sec')->default(15);
             $table->boolean('is_active')->default(true);
             $table->integer('last_evaluated_at')->nullable();
             $table->timestamps();

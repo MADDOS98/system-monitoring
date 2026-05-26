@@ -58,6 +58,7 @@
                             <th class="text-left px-3 py-2">Level</th>
                             <th class="text-right px-3 py-2">Window</th>
                             <th class="text-right px-3 py-2">Ratio</th>
+                            <th class="text-right px-3 py-2">Reset</th>
                             <th class="text-center px-3 py-2">Active</th>
                             <th class="text-right px-6 py-2 w-44">Actions</th>
                         </tr>
@@ -91,6 +92,7 @@
                                 </td>
                                 <td class="px-3 py-3 text-right text-neutral-300">{{ $rule->window_sec }}s</td>
                                 <td class="px-3 py-3 text-right text-neutral-300">{{ $rule->ratio }}</td>
+                                <td class="px-3 py-3 text-right text-neutral-300">{{ $rule->inactive_reset_sec }}s</td>
                                 <td class="px-3 py-3 text-center">
                                     <button type="button"
                                             wire:click="toggleActive({{ $rule->id }})"
@@ -131,7 +133,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="py-8 text-center text-neutral-500">No rules defined yet. Switch to "Add new" tab to create one.</td>
+                                <td colspan="10" class="py-8 text-center text-neutral-500">No rules defined yet. Switch to "Add new" tab to create one.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -209,6 +211,14 @@
                     </div>
 
                     <div class="col-span-3">
+                        <label class="block text-[11px] font-mono text-neutral-500 mb-1">Inactive reset (sec) <span class="text-neutral-600">(&lt; window)</span></label>
+                        <input type="number" min="1" max="{{ max(1, $window_sec - 1) }}" step="1" wire:model="inactive_reset_sec"
+                               class="w-full px-3 py-1.5 bg-panel border border-border rounded-md text-xs text-text font-mono outline-none focus:border-neutral-600"
+                               placeholder="15">
+                        @error('inactive_reset_sec') <p class="text-[11px] text-red-400 mt-1">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div class="col-span-3">
                         <label class="block text-[11px] font-mono text-neutral-500 mb-1">Ratio <span class="text-neutral-600">(0.01–1.00)</span></label>
                         <input type="number" min="0.01" max="1" step="0.01" wire:model="ratio"
                                class="w-full px-3 py-1.5 bg-panel border border-border rounded-md text-xs text-text font-mono outline-none focus:border-neutral-600"
@@ -216,7 +226,8 @@
                         @error('ratio') <p class="text-[11px] text-red-400 mt-1">{{ $message }}</p> @enderror
                     </div>
 
-                    <div class="col-span-3 flex items-end">
+                    {{-- Row 3 (active toggle) --}}
+                    <div class="col-span-12 flex items-center">
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input type="checkbox" wire:model="is_active"
                                    class="w-4 h-4 rounded bg-panel border border-border text-emerald-400 focus:ring-0">

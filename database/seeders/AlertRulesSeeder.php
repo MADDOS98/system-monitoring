@@ -49,11 +49,12 @@ class AlertRulesSeeder extends Seeder
                     'level'    => $rule['level'],
                 ],
                 [
-                    'name'       => $rule['name'],
-                    'threshold'  => $rule['threshold'],
-                    'window_sec' => 60,
-                    'ratio'      => 0.6,
-                    'is_active'  => true,
+                    'name'               => $rule['name'],
+                    'threshold'          => $rule['threshold'],
+                    'window_sec'         => 60,
+                    'ratio'              => 0.6,
+                    'inactive_reset_sec' => 15,
+                    'is_active'          => true,
                 ]
             );
         }

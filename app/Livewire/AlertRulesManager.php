@@ -13,26 +13,35 @@ class AlertRulesManager extends Component
     public ?int $editingId = null;
     public ?int $confirmId = null;
 
-    public string $name       = '';
-    public string $metric     = 'cpu';
-    public string $operator   = '>';
-    public float  $threshold  = 0.0;
-    public string $level      = 'warning';
-    public int    $window_sec = 60;
-    public float  $ratio      = 0.6;
-    public bool   $is_active  = true;
+    public string $name               = '';
+    public string $metric             = 'cpu';
+    public string $operator           = '>';
+    public float  $threshold          = 0.0;
+    public string $level              = 'warning';
+    public int    $window_sec         = 60;
+    public float  $ratio              = 0.6;
+    public int    $inactive_reset_sec = 15;
+    public bool   $is_active          = true;
 
     protected function rules(): array
     {
         return [
-            'name'       => 'required|string|max:100',
-            'metric'     => 'required|string|in:' . implode(',', AlertRule::METRICS),
-            'operator'   => 'required|string|in:' . implode(',', AlertRule::OPERATORS),
-            'threshold'  => 'required|numeric',
-            'level'      => 'required|string|in:' . implode(',', AlertRule::LEVELS),
-            'window_sec' => 'required|integer|min:1',
-            'ratio'      => 'required|numeric|min:0.01|max:1',
-            'is_active'  => 'boolean',
+            'name'               => 'required|string|max:100',
+            'metric'             => 'required|string|in:' . implode(',', AlertRule::METRICS),
+            'operator'           => 'required|string|in:' . implode(',', AlertRule::OPERATORS),
+            'threshold'          => 'required|numeric',
+            'level'              => 'required|string|in:' . implode(',', AlertRule::LEVELS),
+            'window_sec'         => 'required|integer|min:1',
+            'ratio'              => 'required|numeric|min:0.01|max:1',
+            'inactive_reset_sec' => 'required|integer|min:1|lt:window_sec',
+            'is_active'          => 'boolean',
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return [
+            'inactive_reset_sec.lt' => 'Inactive reset must be strictly less than window (max = window_sec − 1).',
         ];
     }
 
@@ -69,17 +78,18 @@ class AlertRulesManager extends Component
         if (!$rule) {
             return;
         }
-        $this->editingId  = $id;
-        $this->name       = $rule->name;
-        $this->metric     = $rule->metric;
-        $this->operator   = $rule->operator;
-        $this->threshold  = (float) $rule->threshold;
-        $this->level      = $rule->level;
-        $this->window_sec = (int) $rule->window_sec;
-        $this->ratio      = (float) $rule->ratio;
-        $this->is_active  = (bool) $rule->is_active;
-        $this->tab        = 'form';
-        $this->confirmId  = null;
+        $this->editingId          = $id;
+        $this->name               = $rule->name;
+        $this->metric             = $rule->metric;
+        $this->operator           = $rule->operator;
+        $this->threshold          = (float) $rule->threshold;
+        $this->level              = $rule->level;
+        $this->window_sec         = (int) $rule->window_sec;
+        $this->ratio              = (float) $rule->ratio;
+        $this->inactive_reset_sec = (int) $rule->inactive_reset_sec;
+        $this->is_active          = (bool) $rule->is_active;
+        $this->tab                = 'form';
+        $this->confirmId          = null;
         $this->resetErrorBag();
     }
 
@@ -131,15 +141,16 @@ class AlertRulesManager extends Component
 
     private function resetFormFields(): void
     {
-        $this->editingId  = null;
-        $this->name       = '';
-        $this->metric     = 'cpu';
-        $this->operator   = '>';
-        $this->threshold  = 0.0;
-        $this->level      = 'warning';
-        $this->window_sec = 60;
-        $this->ratio      = 0.6;
-        $this->is_active  = true;
+        $this->editingId          = null;
+        $this->name               = '';
+        $this->metric             = 'cpu';
+        $this->operator           = '>';
+        $this->threshold          = 0.0;
+        $this->level              = 'warning';
+        $this->window_sec         = 60;
+        $this->ratio              = 0.6;
+        $this->inactive_reset_sec = 15;
+        $this->is_active          = true;
         $this->resetErrorBag();
     }
 
