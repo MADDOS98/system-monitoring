@@ -281,6 +281,11 @@
         const data = JSON.parse(canvas.dataset.chart || '{"labels":[],"values":[]}');
         if (usageChart) usageChart.destroy();
 
+        // Y axis fixat la [0, totalGb] — re-citit la fiecare rebuild ca sa
+        // urmareasca eventuale schimbari de totalBytes prin morph.updated.
+        const totalBytesAttr = parseFloat(getRoot()?.dataset.totalBytes || '0');
+        const totalGb        = totalBytesAttr > 0 ? totalBytesAttr / (1024 * 1024 * 1024) : null;
+
         usageChart = new Chart(canvas, {
             type: 'line',
             data: {
@@ -308,7 +313,7 @@
                 },
                 scales: {
                     x: { ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 }, maxTicksLimit: 8 }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#2a2a2a' } },
-                    y: { ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#2a2a2a' } }
+                    y: { ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#2a2a2a' }, beginAtZero: true, ...(totalGb ? { suggestedMax: totalGb } : {}) }
                 }
             }
         });
