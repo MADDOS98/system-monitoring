@@ -228,11 +228,20 @@
         rebuildConnTable(d.byIp);
     }
 
+    // Y axis dinamic: rotunjit in sus la urmatorul Mbps intreg (floor minim 1).
+    // 0.01 Mbps observat => max 1; 1.5 Mbps => max 2; etc.
+    function computeYMax(c) {
+        const all = [...(c?.rx || []), ...(c?.tx || [])];
+        if (all.length === 0) return 1;
+        return Math.max(1, Math.ceil(Math.max(...all, 0)));
+    }
+
     function applyChartData(c) {
         if (!chart || !c) return;
-        chart.data.labels           = c.labels;
-        chart.data.datasets[0].data = c.rx;
-        chart.data.datasets[1].data = c.tx;
+        chart.data.labels                    = c.labels;
+        chart.data.datasets[0].data          = c.rx;
+        chart.data.datasets[1].data          = c.tx;
+        chart.options.scales.y.suggestedMax  = computeYMax(c);
         chart.update('none');
     }
 
@@ -241,6 +250,8 @@
         if (!canvas) return;
         const data = JSON.parse(canvas.dataset.chart || '{"labels":[],"rx":[],"tx":[]}');
         if (chart) chart.destroy();
+
+        const initialYMax = computeYMax(data);
 
         chart = new Chart(canvas, {
             type: 'line',
@@ -267,7 +278,7 @@
                 },
                 scales: {
                     x: { ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 }, maxTicksLimit: 8 }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#2a2a2a' } },
-                    y: { ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#2a2a2a' }, beginAtZero: true }
+                    y: { ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#2a2a2a' }, beginAtZero: true, suggestedMax: initialYMax }
                 }
             }
         });

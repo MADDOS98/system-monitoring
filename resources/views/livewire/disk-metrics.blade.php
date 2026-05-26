@@ -223,11 +223,19 @@
         }
     }
 
+    // Y axis dinamic pentru I/O: rotunjit in sus la urmatorul MB/s intreg (floor minim 1).
+    function computeIoYMax(c) {
+        const all = [...(c?.read || []), ...(c?.write || [])];
+        if (all.length === 0) return 1;
+        return Math.max(1, Math.ceil(Math.max(...all, 0)));
+    }
+
     function applyIoChartData(c) {
         if (!ioChart || !c) return;
-        ioChart.data.labels           = c.labels;
-        ioChart.data.datasets[0].data = c.read;
-        ioChart.data.datasets[1].data = c.write;
+        ioChart.data.labels                   = c.labels;
+        ioChart.data.datasets[0].data         = c.read;
+        ioChart.data.datasets[1].data         = c.write;
+        ioChart.options.scales.y.suggestedMax = computeIoYMax(c);
         ioChart.update('none');
     }
 
@@ -243,6 +251,8 @@
         if (!canvas) return;
         const data = JSON.parse(canvas.dataset.chart || '{"labels":[],"read":[],"write":[]}');
         if (ioChart) ioChart.destroy();
+
+        const initialIoYMax = computeIoYMax(data);
 
         ioChart = new Chart(canvas, {
             type: 'line',
@@ -269,7 +279,7 @@
                 },
                 scales: {
                     x: { ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 }, maxTicksLimit: 8 }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#2a2a2a' } },
-                    y: { ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#2a2a2a' }, beginAtZero: true }
+                    y: { ticks: { color: '#6b7280', font: { family: 'monospace', size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#2a2a2a' }, beginAtZero: true, suggestedMax: initialIoYMax }
                 }
             }
         });
