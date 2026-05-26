@@ -289,6 +289,11 @@
     });
     poller.start();
 
+    // Opreste poller-ul cand userul navigheaza wire:navigate spre alt tab/pagina,
+    // altfel closure-ul ramane viu si vechiul setInterval continua sa polezeze =>
+    // requesturi care se acumuleaza la fiecare tab-switch.
+    document.addEventListener('livewire:navigating', () => poller.stop(), { once: true });
+
     Livewire.hook('morph.updated', ({ component }) => {
         if (component.name === 'network-metrics') {
             buildChart();

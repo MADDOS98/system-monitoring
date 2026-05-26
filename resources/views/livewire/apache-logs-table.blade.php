@@ -462,6 +462,11 @@
     });
     poller.start();
 
+    // Opreste poller-ul cand userul navigheaza wire:navigate spre alta pagina,
+    // altfel closure-ul ramane viu si vechiul setInterval continua sa polezeze =>
+    // requesturi care se acumuleaza la fiecare navigare.
+    document.addEventListener('livewire:navigating', () => poller.stop(), { once: true });
+
     Livewire.hook('morph.updated', ({ component }) => {
         if (component.id === componentId) {
             refreshLastSeenIdFromDom();
