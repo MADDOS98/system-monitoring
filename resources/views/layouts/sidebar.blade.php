@@ -88,6 +88,15 @@
                     </span>
                 @endif
             </a>
+            <a href="{{ route('percentiles') }}" wire:navigate
+               class="flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150
+                      {{ request()->routeIs('percentiles*') ? 'bg-panel text-text' : 'text-label hover:bg-panel hover:text-text' }}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path d="M3 3v18h18"/>
+                    <path d="M7 14l3-3 4 4 5-5"/>
+                </svg>
+                Percentiles
+            </a>
         </nav>
     </div>
 

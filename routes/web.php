@@ -28,6 +28,10 @@ Route::get('/alerts', fn() => view('alerts.index'))
     ->middleware(['auth', 'verified'])
     ->name('alerts');
 
+Route::get('/percentiles', fn() => view('percentiles.index'))
+    ->middleware(['auth', 'verified'])
+    ->name('percentiles');
+
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
