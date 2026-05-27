@@ -13,11 +13,15 @@ class AlertsList extends Component
     public string $metricFilter = 'all';
     public string $search       = '';
 
+    /** True intre primul click pe "Read all" si confirmare/anulare. */
+    public bool $confirmingReadAll = false;
+
     public function setTab(string $tab): void
     {
         if (in_array($tab, ['active', 'read'], true)) {
             $this->tab = $tab;
         }
+        $this->confirmingReadAll = false;
     }
 
     public function setLevelFilter(string $level): void
@@ -25,6 +29,7 @@ class AlertsList extends Component
         if (in_array($level, ['all', 'critical', 'warning', 'info'], true)) {
             $this->levelFilter = $level;
         }
+        $this->confirmingReadAll = false;
     }
 
     public function markAsRead(int $id): void
@@ -37,9 +42,48 @@ class AlertsList extends Component
 
     public function clearFilters(): void
     {
-        $this->levelFilter  = 'all';
-        $this->metricFilter = 'all';
-        $this->search       = '';
+        $this->levelFilter       = 'all';
+        $this->metricFilter      = 'all';
+        $this->search            = '';
+        $this->confirmingReadAll = false;
+    }
+
+    public function requestReadAll(): void
+    {
+        $this->confirmingReadAll = true;
+    }
+
+    public function cancelReadAll(): void
+    {
+        $this->confirmingReadAll = false;
+    }
+
+    /**
+     * Marcheaza ca CITIT toate alertele active care MATCHEAZA filtrul curent
+     * (level + metric + search). Doar pe tab=active are sens — alertele deja
+     * citite raman neschimbate.
+     */
+    public function confirmReadAll(): void
+    {
+        if ($this->tab !== 'active') {
+            $this->confirmingReadAll = false;
+            return;
+        }
+
+        Alert::query()
+            ->whereNull('read_at')
+            ->when($this->metricFilter !== 'all', fn ($q) => $q->where('metric', $this->metricFilter))
+            ->when($this->levelFilter !== 'all',  fn ($q) => $q->where('level',  $this->levelFilter))
+            ->when(trim($this->search) !== '', function ($q) {
+                $term = '%' . trim($this->search) . '%';
+                $q->where(function ($q) use ($term) {
+                    $q->where('message', 'LIKE', $term)
+                      ->orWhereHas('rule', fn ($q2) => $q2->where('name', 'LIKE', $term));
+                });
+            })
+            ->update(['read_at' => time()]);
+
+        $this->confirmingReadAll = false;
     }
 
     public function hasActiveFilters(): bool

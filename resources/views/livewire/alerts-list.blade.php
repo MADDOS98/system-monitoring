@@ -124,6 +124,33 @@
 
         {{-- Action buttons --}}
         <div class="flex items-center gap-2 ml-auto">
+
+            {{-- Read all (cu confirmare double-click). Doar pe tab active si daca exista alerte vizibile. --}}
+            @if($tab === 'active' && $alerts->count() > 0)
+                @if($confirmingReadAll)
+                    <button type="button" wire:click="confirmReadAll"
+                            class="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-mono
+                                   bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500/25 transition-colors duration-150">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M20 6L9 17l-5-5"/>
+                        </svg>
+                        Confirm? Read {{ $alerts->count() }} alert{{ $alerts->count() === 1 ? '' : 's' }}
+                    </button>
+                    <button type="button" wire:click="cancelReadAll"
+                            class="px-2.5 py-1.5 bg-panel border border-border rounded-md text-xs font-mono text-neutral-500 hover:text-neutral-200 transition-colors duration-150">
+                        Cancel
+                    </button>
+                @else
+                    <button type="button" wire:click="requestReadAll"
+                            class="flex items-center gap-2 px-3 py-1.5 bg-panel border border-border rounded-md text-xs font-mono text-label hover:text-text transition-colors duration-150">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M20 6L9 17l-5-5"/>
+                        </svg>
+                        Read all
+                    </button>
+                @endif
+            @endif
+
             <button type="button"
                 onclick="Livewire.dispatch('open-alert-rules-manager')"
                 class="flex items-center gap-2 px-3 py-1.5 bg-panel border border-border rounded-md text-xs font-mono text-label hover:text-text transition-colors duration-150">

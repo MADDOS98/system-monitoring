@@ -16,6 +16,9 @@ class TabAlerts extends Component
         'disk'    => ['disk_io_read', 'disk_io_write'],
     ];
 
+    /** True intre primul click pe "Read all" si confirmare/anulare. */
+    public bool $confirmingReadAll = false;
+
     public function mount(string $tab): void
     {
         $this->tab = $tab;
@@ -27,6 +30,33 @@ class TabAlerts extends Component
         if ($alert && !$alert->isRead()) {
             $alert->markRead();
         }
+    }
+
+    public function requestReadAll(): void
+    {
+        $this->confirmingReadAll = true;
+    }
+
+    public function cancelReadAll(): void
+    {
+        $this->confirmingReadAll = false;
+    }
+
+    /** Marcheaza ca CITITE toate alertele active pentru metricele tab-ului curent. */
+    public function confirmReadAll(): void
+    {
+        $metrics = self::TAB_TO_METRICS[$this->tab] ?? [];
+        if (empty($metrics)) {
+            $this->confirmingReadAll = false;
+            return;
+        }
+
+        Alert::query()
+            ->whereNull('read_at')
+            ->whereIn('metric', $metrics)
+            ->update(['read_at' => time()]);
+
+        $this->confirmingReadAll = false;
     }
 
     public function render()

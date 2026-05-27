@@ -31,10 +31,32 @@
                     Active alerts
                     <span class="text-[10px] bg-red-700 text-white rounded-full px-1.5 py-0.5 ml-1">{{ $alerts->count() }}</span>
                 </p>
-                <a href="{{ route('alerts') }}" wire:navigate
-                   class="text-[11px] font-mono text-muted hover:text-text transition-colors">
-                    View all &rarr;
-                </a>
+                <div class="flex items-center gap-3">
+                    {{-- Read all (cu confirmare double-click) --}}
+                    @if($confirmingReadAll)
+                        <button type="button" wire:click="confirmReadAll"
+                                class="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono
+                                       bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500/25 transition-colors duration-150">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+                            Confirm? Read {{ $alerts->count() }}
+                        </button>
+                        <button type="button" wire:click="cancelReadAll"
+                                class="text-[11px] font-mono text-neutral-500 hover:text-neutral-200 transition-colors">
+                            Cancel
+                        </button>
+                    @else
+                        <button type="button" wire:click="requestReadAll"
+                                class="flex items-center gap-1 text-[11px] font-mono text-muted hover:text-text transition-colors">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+                            Read all
+                        </button>
+                    @endif
+
+                    <a href="{{ route('alerts') }}" wire:navigate
+                       class="text-[11px] font-mono text-muted hover:text-text transition-colors">
+                        View all &rarr;
+                    </a>
+                </div>
             </div>
             <div class="divide-y divide-border overflow-y-auto max-h-40">
                 @foreach($alerts as $alert)
