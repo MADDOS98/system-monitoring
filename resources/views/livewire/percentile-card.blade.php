@@ -1,5 +1,5 @@
 <div wire:poll.60s
-     class="rounded-lg border border-border bg-panel px-5 py-4">
+     class="rounded-lg border border-border px-5 py-4">
 
     @php
         $p          = $percentile;
@@ -21,10 +21,10 @@
 
     {{-- Header: window label + percentile badge --}}
     <div class="flex items-center justify-between mb-2">
-        <span class="text-[10px] font-mono uppercase tracking-widest text-muted">
+        <span class="text-[11px] font-mono uppercase tracking-widest text-muted">
             {{ $window }} min window
         </span>
-        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold
+        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono font-bold
                      bg-amber-950/40 text-amber-300 border border-amber-900/60">
             P{{ $pInt }} &middot; {{ $pInt }}%
         </span>
@@ -46,7 +46,7 @@
         {{-- Slider --}}
         <div class="mb-3">
             {{-- Axis labels --}}
-            <div class="flex justify-between text-[10px] font-mono text-muted mb-1">
+            <div class="flex justify-between text-[11px] font-mono text-muted mb-1">
                 <span>0</span>
                 <span>{{ $isPercent ? '50' : number_format($axisMax / 2, 1) }}</span>
                 <span>{{ $isPercent ? '100' . $unit : number_format($axisMax, 1) . ' ' . $unit }}</span>
@@ -68,12 +68,12 @@
             {{-- Tick labels --}}
             <div class="relative h-4 mt-1">
                 @if($median !== null && $medianPos !== null)
-                    <span class="absolute text-[10px] font-mono text-muted -translate-x-1/2 whitespace-nowrap"
+                    <span class="absolute text-[11px] font-mono text-muted -translate-x-1/2 whitespace-nowrap"
                           style="left: {{ $medianPos }}%">
                         med {{ number_format($median, 0) }}
                     </span>
                 @endif
-                <span class="absolute text-[10px] font-mono px-1.5 py-px rounded
+                <span class="absolute text-[11px] font-mono px-1.5 py-px rounded
                              bg-amber-900/60 text-amber-200 -translate-x-1/2 whitespace-nowrap"
                       style="left: {{ $valuePos }}%">
                     P{{ $pInt }} {{ number_format($data['value'], 0) }}

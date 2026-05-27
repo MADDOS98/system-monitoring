@@ -42,7 +42,8 @@
             @case('disk')    <livewire:disk-metrics />    @break
         @endswitch
 
-        
+        {{-- Percentiles pentru tab-ul curent (la finalul paginii) --}}
+        <livewire:tab-percentiles :tab="$tab" :key="'tab-percentiles-' . $tab" />
 
     </div>
 
