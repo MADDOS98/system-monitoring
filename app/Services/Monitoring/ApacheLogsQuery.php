@@ -6,6 +6,7 @@ use App\Models\ApacheLog;
 use App\Models\HostReputation;
 use Carbon\Carbon;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\DB;
 
 class ApacheLogsQuery
@@ -77,16 +78,25 @@ class ApacheLogsQuery
     }
 
     /**
-     * Top 15 IP-uri intr-o fereastra, cu reputatii imbinate.
+     * IP-uri intr-o fereastra, paginate, cu reputatii imbinate.
+     *
+     * Returneaza un LengthAwarePaginator. Filtrarea pe tab se face IN PHP
+     * (post-join cu host_reputations) inainte de paginare — N e mic (10-200
+     * IP-uri distinct per fereastra) deci array_slice e ieftin.
      */
-    public function topIps(int $fromTs, int $toTs, string $tab = 'All', int $limit = 15): array
-    {
+    public function topIps(
+        int $fromTs,
+        int $toTs,
+        string $tab = 'All',
+        int $page = 1,
+        int $perPage = 15,
+    ): LengthAwarePaginator {
         $reputationsByIp = DB::connection(self::CONNECTION)
             ->table('host_reputations')
             ->get(['ip', 'host', 'status'])
             ->keyBy('ip');
 
-        return DB::connection(self::CONNECTION)->table('apache_logs')
+        $allRows = DB::connection(self::CONNECTION)->table('apache_logs')
             ->when($fromTs, fn($q) => $q->where('log_time', '>=', $fromTs))
             ->when($toTs,   fn($q) => $q->where('log_time', '<=', $toTs))
             ->selectRaw('
@@ -101,7 +111,6 @@ class ApacheLogsQuery
             ')
             ->groupBy('remote_host')
             ->orderByDesc('reqs')
-            ->limit($limit)
             ->get()
             ->map(function ($row) use ($reputationsByIp) {
                 $total = $row->reqs ?: 1;
@@ -142,6 +151,19 @@ class ApacheLogsQuery
             })
             ->values()
             ->all();
+
+        $total   = count($allRows);
+        $page    = max(1, $page);
+        $offset  = ($page - 1) * $perPage;
+        $items   = array_slice($allRows, $offset, $perPage);
+
+        return new LengthAwarePaginator(
+            $items,
+            $total,
+            $perPage,
+            $page,
+            ['path' => Paginator::resolveCurrentPath()]
+        );
     }
 
     /**

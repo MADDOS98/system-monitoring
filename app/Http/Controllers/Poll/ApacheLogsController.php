@@ -20,6 +20,7 @@ class ApacheLogsController extends Controller
         $searchField = (string) $request->input('search_field', 'any');
         $tab         = (string) $request->input('tab', 'All');
         $sinceId     = (int) $request->input('since_id', 0);
+        $topIpsPage  = max(1, (int) $request->input('top_ips_page', 1));
 
         if ($from <= 0 || $to <= 0 || $to <= $from) {
             return response()->json(['error' => 'invalid time range'], 400);
@@ -36,7 +37,8 @@ class ApacheLogsController extends Controller
         $bucketSeconds = BucketResolver::secondsFor(max(1, $diff));
         $day           = Carbon::createFromTimestamp($to)->format('Y-m-d');
 
-        $paginator = $q->paginate($from, $to, $page, $search, $searchField);
+        $paginator      = $q->paginate($from, $to, $page, $search, $searchField);
+        $topIpsPaginator = $q->topIps($from, $to, $tab, $topIpsPage);
 
         return response()->json([
             'bucketSeconds' => $bucketSeconds,
@@ -52,7 +54,14 @@ class ApacheLogsController extends Controller
             'new_logs' => [
                 'rows' => $q->newSince($sinceId),
             ],
-            'top_ips' => $q->topIps($from, $to, $tab),
+            'top_ips' => [
+                'rows'      => $topIpsPaginator->items(),
+                'page'      => $topIpsPaginator->currentPage(),
+                'last_page' => $topIpsPaginator->lastPage(),
+                'total'     => $topIpsPaginator->total(),
+                'from'      => $topIpsPaginator->firstItem(),
+                'to'        => $topIpsPaginator->lastItem(),
+            ],
             'status'  => $q->byStatus($from, $to),
             'peak'    => $q->peakBins($day),
         ]);

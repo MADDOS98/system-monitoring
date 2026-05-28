@@ -445,7 +445,9 @@
             const { from, to }  = getTimeRange();
             if (!from || !to) return null;
             const s = getState();
-            const topIpsTab = document.querySelector('[data-component="top-ips"]')?.dataset.tab || 'All';
+            const topIpsNode = document.querySelector('[data-component="top-ips"]');
+            const topIpsTab  = topIpsNode?.dataset.tab  || 'All';
+            const topIpsPage = topIpsNode?.dataset.page || '1';
             const qs = new URLSearchParams({
                 from: String(from),
                 to:   String(to),
@@ -453,6 +455,7 @@
                 search:       s.searchQuery,
                 search_field: s.searchField,
                 tab:          topIpsTab,
+                top_ips_page: topIpsPage,
                 since_id:     String(lastSeenId),
             }).toString();
             return `/poll/apache-logs?${qs}`;

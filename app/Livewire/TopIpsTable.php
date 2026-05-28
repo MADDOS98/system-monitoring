@@ -6,9 +6,14 @@ use App\Services\Monitoring\ApacheLogsQuery;
 use App\Services\Monitoring\BucketResolver;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class TopIpsTable extends Component
 {
+    use WithPagination;
+
+    protected $paginationTheme = 'tailwind';
+
     public ?int $from = null;
     public ?int $to   = null;
     public string $tab = 'All';
@@ -24,11 +29,13 @@ class TopIpsTable extends Component
     {
         $this->from = (int) $from;
         $this->to   = (int) $to;
+        $this->resetPage();
     }
 
     public function setTab(string $tab): void
     {
         $this->tab = $tab;
+        $this->resetPage();
     }
 
     public function render()
@@ -36,11 +43,11 @@ class TopIpsTable extends Component
         $diff          = max(1, ($this->to ?? 0) - ($this->from ?? 0));
         $bucketSeconds = BucketResolver::secondsFor($diff);
 
-        $topIps = collect(app(ApacheLogsQuery::class)->topIps(
-            (int) $this->from,
-            (int) $this->to,
-            $this->tab
-        ))->map(fn($r) => (object) $r);
+        // Mapeaza items (arrays) la stdClass pentru a pastra blade-ul existent
+        // care foloseste $ip->ip / $ip->reqs / etc.
+        $topIps = app(ApacheLogsQuery::class)
+            ->topIps((int) $this->from, (int) $this->to, $this->tab, $this->getPage())
+            ->through(fn ($row) => (object) $row);
 
         return view('livewire.top-ips-table', compact('topIps', 'bucketSeconds'));
     }

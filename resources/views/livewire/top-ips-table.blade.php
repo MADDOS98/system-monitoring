@@ -11,6 +11,7 @@
     }"
     data-component="top-ips"
     data-tab="{{ $this->tab }}"
+    data-page="{{ $topIps->currentPage() }}"
     data-bucket-seconds="{{ $bucketSeconds }}"
     class="rounded-lg border border-border overflow-hidden flex flex-col"
     style="height: calc(16 * 54px)">
@@ -145,6 +146,39 @@
         @endforelse
     </div>
 
+    {{-- Pagination footer — randat mereu; butoanele dezactivate cand nu sunt necesare. --}}
+    @php
+        $isFirst         = $topIps->onFirstPage();
+        $isLast          = ! $topIps->hasMorePages();
+        $disabledClasses = 'text-[#6b7280] opacity-30 cursor-not-allowed pointer-events-none';
+        $enabledClasses  = 'text-label hover:text-text';
+    @endphp
+    <div data-pagination class="px-4 py-2.5 border-t border-border bg-sidebar flex items-center justify-between flex-shrink-0">
+
+        <button
+            data-prev-button
+            wire:click="previousPage"
+            wire:loading.attr="disabled"
+            @if($isFirst) disabled @endif
+            class="px-3 py-1 bg-panel border border-border rounded text-xs font-mono transition-colors duration-150 {{ $isFirst ? $disabledClasses : $enabledClasses }}">
+            ← Newer
+        </button>
+
+        <span data-pagination-summary class="text-xs font-mono text-[#6b7280]">
+            {{ $topIps->firstItem() ?? 0 }}–{{ $topIps->lastItem() ?? 0 }} of {{ $topIps->total() }}
+        </span>
+
+        <button
+            data-next-button
+            wire:click="nextPage"
+            wire:loading.attr="disabled"
+            @if($isLast) disabled @endif
+            class="px-3 py-1 bg-panel border border-border rounded text-xs font-mono transition-colors duration-150 {{ $isLast ? $disabledClasses : $enabledClasses }}">
+            Older →
+        </button>
+
+    </div>
+
 @script
 <script>
 (function () {
@@ -209,21 +243,59 @@
             </div>`;
     }
 
-    function updateTopIps(topIps) {
+    function setButtonDisabled(btn, disabled) {
+        if (!btn) return;
+        btn.toggleAttribute('disabled', disabled);
+        const dis = ['opacity-30', 'cursor-not-allowed', 'pointer-events-none', 'text-[#6b7280]'];
+        const en  = ['text-label', 'hover:text-text'];
+        if (disabled) {
+            dis.forEach(c => btn.classList.add(c));
+            en.forEach(c  => btn.classList.remove(c));
+        } else {
+            dis.forEach(c => btn.classList.remove(c));
+            en.forEach(c  => btn.classList.add(c));
+        }
+    }
+
+    function updateTopIps(payload) {
         const root = getRoot();
         if (!root) return;
         const container = root.querySelector('.overflow-y-auto.flex-1');
         if (!container) return;
-        if (!Array.isArray(topIps) || topIps.length === 0) {
+
+        // Acceptam si payload-ul vechi (array flat) pentru robustete, dar noul format e object.
+        const rows = Array.isArray(payload)
+            ? payload
+            : (Array.isArray(payload?.rows) ? payload.rows : []);
+
+        if (rows.length === 0) {
             container.innerHTML = '<div class="flex items-center justify-center h-full text-[#6b7280] text-xs font-mono">No data available.</div>';
-            return;
+        } else {
+            container.innerHTML = rows.map(buildIpRow).join('');
         }
-        container.innerHTML = topIps.map(buildIpRow).join('');
+
+        // Daca payload-ul e in noul format object, updateaza footer-ul + butoanele
+        if (!Array.isArray(payload) && payload) {
+            const summary = root.querySelector('[data-pagination-summary]');
+            if (summary) {
+                const f = payload.from ?? 0;
+                const t = payload.to   ?? 0;
+                summary.textContent = `${f}–${t} of ${payload.total ?? 0}`;
+            }
+
+            const currentPage = payload.page      ?? 1;
+            const lastPage    = payload.last_page ?? 1;
+            setButtonDisabled(root.querySelector('[data-prev-button]'), currentPage <= 1);
+            setButtonDisabled(root.querySelector('[data-next-button]'), currentPage >= lastPage);
+
+            // Mentine sincronizat data-page pentru poll-urile urmatoare
+            root.dataset.page = String(currentPage);
+        }
     }
 
     document.addEventListener('apache-logs-poll', (e) => {
         if (!e.detail) return;
-        updateTopIps(e.detail.top_ips || []);
+        updateTopIps(e.detail.top_ips);
     });
 })();
 </script>
