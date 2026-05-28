@@ -15,6 +15,11 @@ class AlertRulesSeeder extends Seeder
             ['name' => 'CPU warning',  'metric' => 'cpu', 'operator' => '>', 'threshold' => 75, 'level' => 'warning'],
             ['name' => 'CPU info',     'metric' => 'cpu', 'operator' => '>', 'threshold' => 50, 'level' => 'info'],
 
+            // CPU stolen group (>) — detecta VM contention / "noisy neighbor"
+            ['name' => 'CPU stolen critical', 'metric' => 'cpu_stolen', 'operator' => '>', 'threshold' => 15, 'level' => 'critical'],
+            ['name' => 'CPU stolen warning',  'metric' => 'cpu_stolen', 'operator' => '>', 'threshold' => 5,  'level' => 'warning'],
+            ['name' => 'CPU stolen info',     'metric' => 'cpu_stolen', 'operator' => '>', 'threshold' => 2,  'level' => 'info'],
+
             // RAM group (>)
             ['name' => 'RAM critical', 'metric' => 'ram', 'operator' => '>', 'threshold' => 90, 'level' => 'critical'],
             ['name' => 'RAM warning',  'metric' => 'ram', 'operator' => '>', 'threshold' => 75, 'level' => 'warning'],

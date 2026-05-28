@@ -33,19 +33,20 @@
     ];
 
     $metricToTab = [
-    'cpu' => 'cpu', 'ram' => 'ram',
+    'cpu' => 'cpu', 'cpu_stolen' => 'cpu', 'ram' => 'ram',
     'disk_io_read' => 'disk', 'disk_io_write' => 'disk',
     'network_in' => 'network', 'network_out' => 'network',
     ];
 
     $metricUnits = [
-    'cpu' => '%', 'ram' => '%',
+    'cpu' => '%', 'cpu_stolen' => '%', 'ram' => '%',
     'disk_io_read' => 'MB/s', 'disk_io_write' => 'MB/s',
     'network_in' => 'Mbps', 'network_out' => 'Mbps',
     ];
 
     $metricLabels = [
     'cpu' => 'cpu.total_usage',
+    'cpu_stolen' => 'cpu.stolen_usage',
     'ram' => 'ram.used_pct',
     'disk_io_read' => 'disk.read_bps',
     'disk_io_write' => 'disk.write_bps',

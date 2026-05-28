@@ -15,6 +15,7 @@ class AlertRule extends Model
 
     public const METRICS = [
         'cpu',
+        'cpu_stolen',
         'ram',
         'disk_io_read',
         'disk_io_write',

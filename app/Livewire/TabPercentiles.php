@@ -14,7 +14,7 @@ class TabPercentiles extends Component
      * multe metrice corespunzatoare in tabela percentiles.
      */
     private const TAB_TO_METRICS = [
-        'cpu'     => ['cpu'],
+        'cpu'     => ['cpu', 'cpu_stolen'],
         'ram'     => ['ram'],
         'network' => ['network_in', 'network_out'],
         'disk'    => ['disk_io_read', 'disk_io_write'],

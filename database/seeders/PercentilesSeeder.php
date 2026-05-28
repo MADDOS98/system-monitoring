@@ -14,6 +14,7 @@ class PercentilesSeeder extends Seeder
         // Cheile trebuie sa fie un subset al AlertRule::METRICS.
         $displayNames = [
             'cpu'           => 'CPU',
+            'cpu_stolen'    => 'CPU stolen',
             'ram'           => 'RAM',
             'disk_io_read'  => 'Disk read',
             'disk_io_write' => 'Disk write',

@@ -16,6 +16,7 @@ class PercentilesPage extends Component
 
     private const METRIC_LABELS = [
         'cpu'           => 'CPU',
+        'cpu_stolen'    => 'CPU stolen',
         'ram'           => 'RAM',
         'disk_io_read'  => 'Disk read',
         'disk_io_write' => 'Disk write',
