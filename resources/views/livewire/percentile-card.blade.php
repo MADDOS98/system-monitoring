@@ -16,6 +16,11 @@
             $medianPos = $median !== null
                 ? min(100, ($median   / $axisMax) * 100)
                 : null;
+
+            // Fill bar = intervalul [min, max] al sample-urilor pe axa slider-ului.
+            $minPos   = min(100, max(0, ($data['min'] / $axisMax) * 100));
+            $maxPos   = min(100, max(0, ($data['max'] / $axisMax) * 100));
+            $fillWidth = max(0, $maxPos - $minPos);
         }
     @endphp
 
@@ -54,6 +59,10 @@
 
             {{-- Track --}}
             <div class="relative h-1.5 bg-amber-950/50 rounded-full">
+                {{-- Fill: portiunea [min..max] din sample-uri, evidentiata --}}
+                <div class="absolute top-0 h-full bg-amber-700/50 rounded-full"
+                     style="left: {{ $minPos }}%; width: {{ $fillWidth }}%"></div>
+
                 {{-- Median tick --}}
                 @if($medianPos !== null)
                     <div class="absolute top-1/2 -translate-y-1/2 w-px h-3 bg-amber-700/70"
@@ -63,6 +72,10 @@
                 {{-- Percentile tick (main) --}}
                 <div class="absolute top-1/2 -translate-y-1/2 w-0.5 h-3.5 bg-amber-400"
                      style="left: {{ $valuePos }}%"></div>
+
+                {{-- Linie intrerupta la capatul max (marker extent) --}}
+                <div class="absolute top-1/2 -translate-y-1/2 h-3 border-l border-dashed border-amber-400/70"
+                     style="left: {{ $maxPos }}%"></div>
             </div>
 
             {{-- Tick labels --}}
