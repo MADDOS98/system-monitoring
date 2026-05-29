@@ -13,8 +13,7 @@
     data-tab="{{ $this->tab }}"
     data-page="{{ $topIps->currentPage() }}"
     data-bucket-seconds="{{ $bucketSeconds }}"
-    class="rounded-lg border border-border overflow-hidden flex flex-col"
-    style="height: calc(16 * 54px)">
+    class="rounded-lg border border-border overflow-hidden flex flex-col">
 
     {{-- Header --}}
     <div class="flex items-center justify-between px-4 py-2.5 bg-sidebar border-b border-border flex-shrink-0">
@@ -48,7 +47,9 @@
     </div>
 
     {{-- Rows --}}
-    <div class="overflow-y-auto flex-1 divide-y divide-[#2a2a2a]">
+    <div data-rows-container
+         class="overflow-y-auto divide-y divide-[#2a2a2a]"
+         style="height: calc(15 * 54px)">
         @forelse ($topIps as $ip)
         @php
         $showTag  = $ip->status !== null;
@@ -260,7 +261,7 @@
     function updateTopIps(payload) {
         const root = getRoot();
         if (!root) return;
-        const container = root.querySelector('.overflow-y-auto.flex-1');
+        const container = root.querySelector('[data-rows-container]');
         if (!container) return;
 
         // Acceptam si payload-ul vechi (array flat) pentru robustete, dar noul format e object.
