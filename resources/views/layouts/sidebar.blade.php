@@ -58,22 +58,6 @@
                 </svg>
                 Apache Logs
             </a>
-            <a href="#"
-               class="flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150
-                      {{ request()->routeIs('network*') ? 'bg-panel text-text' : 'text-label hover:bg-panel hover:text-text' }}">
-                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20M12 2a15.3 15.3 0 0 0 0 20"/>
-                </svg>
-                Network
-            </a>
-            <a href="#"
-               class="flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150
-                      {{ request()->routeIs('storage*') ? 'bg-panel text-text' : 'text-label hover:bg-panel hover:text-text' }}">
-                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                    <rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 10h8M8 14h5"/>
-                </svg>
-                Storage
-            </a>
             <a href="{{ route('alerts') }}" wire:navigate
                class="flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150
                       {{ request()->routeIs('alerts*') ? 'bg-panel text-text' : 'text-label hover:bg-panel hover:text-text' }}">
