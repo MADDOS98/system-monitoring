@@ -10,6 +10,7 @@ use App\Models\DiskUsageMetric;
 use App\Models\NetworkMetric;
 use App\Models\RamMetric;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 class SimulateData extends Command
 {
@@ -101,6 +102,163 @@ class SimulateData extends Command
     // Conexiuni curente per IP (stare persistenta, drift cu inertie)
     private array $connLevels = [];
 
+    // ── Process metrics: catalog + stare per proces ──────────────────────────
+    // Cadenta: 1 sample / proces / 15s (cumulativ pe fereastra).
+    // cpu_pct stocat e cumulativ pentru toate cele 15 secunde, deci poate
+    // ajunge teoretic la ~1500% daca procesul ramane pegged 100% intreaga
+    // fereastra.
+    private const PROCESS_INTERVAL_SEC = 15;
+
+    private const PROCESS_PROFILES = [
+        'node' => [
+            'commands' => ['node /srv/api/server.js', 'node /srv/api/auth.js'],
+            'count'    => 3,
+            'baseCpu'  => 3.0,
+            'baseRam'  => 2_350_000,
+            'baseRead' => 145_000,
+            'baseWrite'=> 90_000,
+            'volatility' => 'high',
+        ],
+        'python3' => [
+            'commands' => ['python3 worker.py --queue=ingest', 'python3 worker.py --queue=email'],
+            'count'    => 2,
+            'baseCpu'  => 2.8,
+            'baseRam'  => 820_000,
+            'baseRead' => 125_000,
+            'baseWrite'=> 35_000,
+            'volatility' => 'high',
+        ],
+        'postgres' => [
+            'commands' => ['postgres: 14/main'],
+            'count'    => 1,
+            'baseCpu'  => 1.6,
+            'baseRam'  => 1_430_000,
+            'baseRead' => 135_000,
+            'baseWrite'=> 200_000,
+            'volatility' => 'mid',
+        ],
+        'apache2' => [
+            'commands' => ['/usr/sbin/apache2 -k start'],
+            'count'    => 1,
+            'baseCpu'  => 1.1,
+            'baseRam'  => 410_000,
+            'baseRead' => 180_000,
+            'baseWrite'=> 30_000,
+            'volatility' => 'mid',
+        ],
+        'elasticsearch' => [
+            'commands' => ['/usr/share/elasticsearch/bin/java -Xmx2g'],
+            'count'    => 1,
+            'baseCpu'  => 0.9,
+            'baseRam'  => 2_150_000,
+            'baseRead' => 85_000,
+            'baseWrite'=> 60_000,
+            'volatility' => 'high',
+        ],
+        'java' => [
+            'commands' => ['java -Dkafka.logs.dir=/var/log/kafka'],
+            'count'    => 1,
+            'baseCpu'  => 0.85,
+            'baseRam'  => 1_840_000,
+            'baseRead' => 40_000,
+            'baseWrite'=> 95_000,
+            'volatility' => 'mid',
+        ],
+        'php-fpm' => [
+            'commands' => ['php-fpm: pool www', 'php-fpm: master process /etc/php/8.2/fpm/php-fpm.conf'],
+            'count'    => 1,
+            'baseCpu'  => 0.5,
+            'baseRam'  => 286_000,
+            'baseRead' => 58_000,
+            'baseWrite'=> 32_000,
+            'volatility' => 'mid',
+        ],
+        'redis-server' => [
+            'commands' => ['/usr/bin/redis-server *:6379'],
+            'count'    => 1,
+            'baseCpu'  => 0.4,
+            'baseRam'  => 209_000,
+            'baseRead' => 4_000,
+            'baseWrite'=> 8_000,
+            'volatility' => 'low',
+        ],
+        'docker' => [
+            'commands' => ['/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock'],
+            'count'    => 1,
+            'baseCpu'  => 0.3,
+            'baseRam'  => 367_000,
+            'baseRead' => 12_000,
+            'baseWrite'=> 14_000,
+            'volatility' => 'low',
+        ],
+        'rsyslogd' => [
+            'commands' => ['/usr/sbin/rsyslogd -n -iNONE'],
+            'count'    => 1,
+            'baseCpu'  => 0.3,
+            'baseRam'  => 14_300,
+            'baseRead' => 600,
+            'baseWrite'=> 320,
+            'volatility' => 'low',
+        ],
+        'containerd' => [
+            'commands' => ['/usr/bin/containerd'],
+            'count'    => 1,
+            'baseCpu'  => 0.22,
+            'baseRam'  => 130_000,
+            'baseRead' => 7_500,
+            'baseWrite'=> 3_800,
+            'volatility' => 'low',
+        ],
+        'nginx' => [
+            'commands' => ['nginx: master process /usr/sbin/nginx', 'nginx: worker process'],
+            'count'    => 4,
+            'baseCpu'  => 0.4,
+            'baseRam'  => 51_000,
+            'baseRead' => 95_000,
+            'baseWrite'=> 25_000,
+            'volatility' => 'mid',
+        ],
+        'mysqld' => [
+            'commands' => ['/usr/sbin/mysqld'],
+            'count'    => 1,
+            'baseCpu'  => 0.7,
+            'baseRam'  => 920_000,
+            'baseRead' => 75_000,
+            'baseWrite'=> 110_000,
+            'volatility' => 'mid',
+        ],
+        'sshd' => [
+            'commands' => ['/usr/sbin/sshd -D'],
+            'count'    => 1,
+            'baseCpu'  => 0.08,
+            'baseRam'  => 6_200,
+            'baseRead' => 200,
+            'baseWrite'=> 100,
+            'volatility' => 'low',
+        ],
+        'systemd' => [
+            'commands' => ['/sbin/init'],
+            'count'    => 1,
+            'baseCpu'  => 0.05,
+            'baseRam'  => 12_500,
+            'baseRead' => 120,
+            'baseWrite'=> 60,
+            'volatility' => 'low',
+        ],
+        'cron' => [
+            'commands' => ['/usr/sbin/cron -f'],
+            'count'    => 1,
+            'baseCpu'  => 0.03,
+            'baseRam'  => 3_200,
+            'baseRead' => 50,
+            'baseWrite'=> 25,
+            'volatility' => 'low',
+        ],
+    ];
+
+    private array $processIds   = [];
+    private array $processState = [];
+
     // Apache logs: pool de IP-uri "regulate" + altele random
     private const APACHE_URIS = [
         '/', '/login', '/register', '/dashboard',
@@ -141,6 +299,10 @@ class SimulateData extends Command
         for ($i = 0; $i < 25; $i++) {
             $this->apacheIpPool[] = mt_rand(1, 254) . '.' . mt_rand(0, 255) . '.' . mt_rand(0, 255) . '.' . mt_rand(1, 254);
         }
+
+        // Process catalog: insertOrIgnore in process_names + process_commands,
+        // apoi reconstruieste cache-ul name → id si state-ul per proces.
+        $this->ensureProcessCatalog();
 
         if (!$this->option('loop')) {
             $this->insertTick(time());
@@ -193,6 +355,14 @@ class SimulateData extends Command
 
         // apache_logs: 1 row / secunda
         ApacheLog::create($this->buildApacheLogRow($ts));
+
+        // process_metrics: 1 row / proces la fiecare 15 secunde
+        if ($ts % self::PROCESS_INTERVAL_SEC === 0) {
+            $rows = $this->buildProcessMetricsRows($ts);
+            if (!empty($rows)) {
+                DB::connection('process_metrics')->table('process_metrics')->insert($rows);
+            }
+        }
     }
 
     private function buildRamRow(int $ts, int $hour): array
@@ -584,5 +754,162 @@ class SimulateData extends Command
             }
         }
         return array_key_first($weights);
+    }
+
+    /**
+     * Asigura ca toate process_names si process_commands din catalog exista
+     * in DB; populeaza cache-ul name → id si state-ul per proces.
+     * Idempotent: poate rula peste un DB deja seedat (insertOrIgnore).
+     */
+    private function ensureProcessCatalog(): void
+    {
+        $db = DB::connection('process_metrics');
+
+        // 1) insertOrIgnore names — UNIQUE pe name face ca insert-ul al doilea
+        // sa fie no-op fara sa pice tranzactia.
+        $namesPayload = [];
+        foreach (array_keys(self::PROCESS_PROFILES) as $name) {
+            $namesPayload[] = ['name' => $name];
+        }
+        $db->table('process_names')->insertOrIgnore($namesPayload);
+
+        // 2) cache name → id
+        foreach ($db->table('process_names')->whereIn('name', array_keys(self::PROCESS_PROFILES))->get(['id', 'name']) as $row) {
+            $this->processIds[$row->name] = (int) $row->id;
+        }
+
+        // 3) insertOrIgnore commands (UNIQUE pe process_name_id + command)
+        $cmdPayload = [];
+        foreach (self::PROCESS_PROFILES as $name => $profile) {
+            $pid = $this->processIds[$name] ?? null;
+            if ($pid === null) continue;
+            foreach ($profile['commands'] as $cmd) {
+                $cmdPayload[] = ['process_name_id' => $pid, 'command' => $cmd];
+            }
+        }
+        if (!empty($cmdPayload)) {
+            $db->table('process_commands')->insertOrIgnore($cmdPayload);
+        }
+
+        // 4) State per proces (drift cu inertie + spike countdowns)
+        foreach (self::PROCESS_PROFILES as $name => $profile) {
+            $this->processState[$name] = [
+                'cpu'         => (float) $profile['baseCpu'],
+                'ram'         => (int)   $profile['baseRam'],
+                'read'        => (int)   $profile['baseRead'],
+                'write'       => (int)   $profile['baseWrite'],
+                'count'       => (int)   $profile['count'],
+                'spikeLeft'   => 0,
+                'spikeMag'    => 0,
+                'extremeLeft' => 0,
+            ];
+        }
+    }
+
+    /**
+     * Construieste 1 rand per proces pentru fereastra de 15 secunde curenta.
+     *
+     * cpu_pct e cumulativ: per_sec_avg × 15. Daca un proces ramane pegged
+     * la ~100% per secunda timp de toata fereastra → ~1500%. Edge case
+     * acoperit prin "extreme spike" cu probabilitate joasa.
+     */
+    private function buildProcessMetricsRows(int $ts): array
+    {
+        $hour       = (int) date('G', $ts);
+        $hourFactor = match (true) {
+            $hour >= 0  && $hour <= 5  => 0.30,
+            $hour >= 6  && $hour <= 9  => 0.75,
+            $hour >= 10 && $hour <= 18 => 1.30,
+            default                    => 0.80,
+        };
+
+        $rows = [];
+
+        foreach (self::PROCESS_PROFILES as $name => $profile) {
+            $pid = $this->processIds[$name] ?? null;
+            if ($pid === null) continue;
+
+            $st  = &$this->processState[$name];
+            $vol = $profile['volatility'];
+
+            // ── CPU per secunda (drift catre baseline * hourFactor + zgomot) ──
+            $target = $profile['baseCpu'] * $hourFactor;
+            $st['cpu'] += ($target - $st['cpu']) * 0.10;
+            $noise = match ($vol) {
+                'high' => mt_rand(-120, 120) / 100,
+                'mid'  => mt_rand(-60, 60)   / 100,
+                default=> mt_rand(-20, 20)   / 100,
+            };
+            $st['cpu'] = max(0, $st['cpu'] + $noise);
+            $perSec = $st['cpu'];
+
+            // Spike multi-thread: 30-100% per sec pentru cateva ferestre
+            $spikeChance = match ($vol) {
+                'high' => 220,
+                'mid'  => 550,
+                default=> 1800,
+            };
+            if ($st['spikeLeft'] <= 0 && mt_rand(1, $spikeChance) === 1) {
+                $st['spikeLeft'] = mt_rand(2, 6);
+                $st['spikeMag']  = mt_rand(30, 100);
+            }
+            if ($st['spikeLeft'] > 0) {
+                $perSec = max($perSec, $st['spikeMag'] * mt_rand(70, 100) / 100);
+                $st['spikeLeft']--;
+            }
+
+            // Extreme: process pegged ~100% timp de toata fereastra → ~1500% cumulativ
+            if ($st['extremeLeft'] <= 0 && $vol !== 'low' && mt_rand(1, 6000) === 1) {
+                $st['extremeLeft'] = 1;
+            }
+            if ($st['extremeLeft'] > 0) {
+                $perSec = mt_rand(9700, 10000) / 100;
+                $st['extremeLeft']--;
+            }
+
+            $cpuPct = round(min(1500, max(0, $perSec * 15)), 2);
+
+            // ── RAM: snapshot + memory leak rar ──
+            $ramTarget = (int) ($profile['baseRam'] * (0.9 + 0.2 * $hourFactor));
+            $st['ram'] += (int) (($ramTarget - $st['ram']) * 0.03);
+            $st['ram'] += mt_rand(-3_000, 3_000);
+            if (in_array($name, ['java', 'elasticsearch'], true) && mt_rand(1, 2500) === 1) {
+                $st['ram'] += mt_rand(80_000, 180_000);
+            }
+            $st['ram'] = max(1_000, min(8_000_000, $st['ram']));
+
+            // ── IO: drift + burst ──
+            $readTarget  = (int) ($profile['baseRead']  * $hourFactor);
+            $writeTarget = (int) ($profile['baseWrite'] * $hourFactor);
+            $st['read']  += (int) (($readTarget  - $st['read'])  * 0.15);
+            $st['write'] += (int) (($writeTarget - $st['write']) * 0.15);
+            $st['read']  += mt_rand(-8_000, 8_000);
+            $st['write'] += mt_rand(-8_000, 8_000);
+            if (mt_rand(1, 600) === 1) $st['read']  += mt_rand(500_000, 5_000_000);
+            if (mt_rand(1, 600) === 1) $st['write'] += mt_rand(500_000, 3_000_000);
+            $st['read']  = max(0, $st['read']);
+            $st['write'] = max(0, $st['write']);
+
+            // ── Count: random walk ancorat la baseline (max ±2 de la base) ──
+            if (mt_rand(1, 350) === 1) {
+                $base  = $profile['count'];
+                $delta = mt_rand(0, 1) ? 1 : -1;
+                $st['count'] = max(max(1, $base - 1), min($base + 2, $st['count'] + $delta));
+            }
+
+            $rows[] = [
+                'process_name_id' => $pid,
+                'collected_at'    => $ts,
+                'count'           => $st['count'],
+                'ram_kb'          => (int) $st['ram'],
+                'cpu_pct'         => $cpuPct,
+                'read_bytes'      => (int) $st['read'],
+                'write_bytes'     => (int) $st['write'],
+            ];
+
+            unset($st);
+        }
+
+        return $rows;
     }
 }
