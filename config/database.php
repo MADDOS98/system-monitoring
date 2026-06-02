@@ -42,6 +42,7 @@ return [
             'journal_mode' => 'WAL',
             'synchronous' => 'NORMAL',
             'transaction_mode' => 'DEFERRED',
+            'auto_vacuum' => env('DB_AUTO_VACUUM', 'INCREMENTAL'),
         ],
 
         'system_metrics' => [
@@ -53,6 +54,7 @@ return [
             'journal_mode' => 'WAL',
             'synchronous' => 'NORMAL',
             'transaction_mode' => 'DEFERRED',
+            'auto_vacuum' => env('DB_AUTO_VACUUM', 'INCREMENTAL'),
         ],
 
         'apache_logs' => [
@@ -64,6 +66,7 @@ return [
             'journal_mode' => 'WAL',
             'synchronous' => 'NORMAL',
             'transaction_mode' => 'DEFERRED',
+            'auto_vacuum' => env('DB_AUTO_VACUUM', 'INCREMENTAL'),
         ],
 
         'mysql' => [
