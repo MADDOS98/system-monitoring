@@ -32,6 +32,10 @@ Route::get('/percentiles', fn() => view('percentiles.index'))
     ->middleware(['auth', 'verified'])
     ->name('percentiles');
 
+Route::get('/processes', fn() => view('processes.index'))
+    ->middleware(['auth', 'verified'])
+    ->name('processes');
+
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
