@@ -6,6 +6,7 @@
 - php artisan migrate --force
 - php artisan migrate --force --path=database/migrations/system_metrics --database=system_metrics
 - php artisan migrate --force --path=database/migrations/apache_logs --database=apache_logs
+- php artisan migrate --force --path=database/migrations/process_metrics --database=process_metrics
 - php artisan db:seed
 - npm install
 - npm run build

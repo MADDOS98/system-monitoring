@@ -69,6 +69,18 @@ return [
             'auto_vacuum' => env('DB_AUTO_VACUUM', 'INCREMENTAL'),
         ],
 
+        'process_metrics' => [
+            'driver' => 'sqlite',
+            'database' => env('DB_PROCESS_METRICS_DATABASE', database_path('process_metrics.sqlite')),
+            'prefix' => '',
+            'foreign_key_constraints' => true,
+            'busy_timeout' => 5000,
+            'journal_mode' => 'WAL',
+            'synchronous' => 'NORMAL',
+            'transaction_mode' => 'DEFERRED',
+            'auto_vacuum' => env('DB_AUTO_VACUUM', 'INCREMENTAL'),
+        ],
+
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DB_URL'),
