@@ -118,7 +118,7 @@
 
         {{-- Rows ─────────────────────────────────────────────────────────── --}}
         {{-- Inaltime stabila pentru 15 randuri (= per_page) ca pagina sa nu salte la ultima pagina. --}}
-        <div class="divide-y divide-[#2a2a2a] overflow-y-auto" style="height: calc(15 * 50.7px)">
+        <div class="divide-y divide-[#2a2a2a] overflow-y-auto" style="max-height: calc(15 * 50.7px)">
             @forelse ($processes as $p)
                 <div wire:key="proc-{{ $p->id }}"
                      class="grid grid-cols-12 px-4 py-3 items-center bg-[#111111] hover:bg-[#161616] transition-[background-color] duration-100">
