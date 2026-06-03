@@ -38,9 +38,9 @@ Route::get('/processes', fn() => view('processes.index'))
     ->name('processes');
 
 Route::get('/processes/{name}', function (string $name, \Illuminate\Http\Request $request) {
-    $tab = $request->query('tab', 'cpu');
-    if (! in_array($tab, ['cpu', 'ram', 'io'], true)) {
-        $tab = 'cpu';
+    $tab = $request->query('tab', 'info');
+    if (! in_array($tab, ['info', 'cpu', 'ram', 'disk'], true)) {
+        $tab = 'info';
     }
     return view('processes.show', compact('name', 'tab'));
 })

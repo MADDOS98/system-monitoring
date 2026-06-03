@@ -35,9 +35,10 @@ class Breadcrumb
     ];
 
     private const PROCESS_TAB_LABELS = [
-        'cpu' => 'CPU',
-        'ram' => 'RAM',
-        'io'  => 'Disk I/O',
+        'info' => 'Info',
+        'cpu'  => 'CPU',
+        'ram'  => 'RAM',
+        'disk' => 'Disk',
     ];
 
     /**
@@ -93,7 +94,7 @@ class Breadcrumb
             'url'   => route('processes.show', ['name' => $name]),
         ];
 
-        $tab = (string) $request->query('tab', 'cpu');
+        $tab = (string) $request->query('tab', 'info');
         if (isset(self::PROCESS_TAB_LABELS[$tab])) {
             $crumbs[] = ['label' => self::PROCESS_TAB_LABELS[$tab], 'url' => null];
         }

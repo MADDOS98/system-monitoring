@@ -26,9 +26,10 @@ class ProcessMetricsController extends Controller
         $q = app(ProcessDetailQuery::class);
 
         $data = match ($type) {
-            'cpu' => $q->cpuSnapshot($name, $from, $to),
-            'ram' => $q->ramSnapshot($name, $from, $to),
-            'io'  => $q->ioSnapshot($name, $from, $to),
+            'cpu'   => $q->cpuSnapshot($name, $from, $to),
+            'ram'   => $q->ramSnapshot($name, $from, $to),
+            'disk'  => $q->diskSnapshot($name, $from, $to),
+            'info'  => $q->infoSnapshot($name, $from, $to),
             default => null,
         };
 

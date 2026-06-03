@@ -88,7 +88,7 @@ class ProcessDetailQuery
         ];
     }
 
-    public function ioSnapshot(string $name, int $fromTs, int $toTs): array
+    public function infoSnapshot(string $name, int $fromTs, int $toTs): array
     {
         $pid = $this->processId($name);
         $period = $this->periodLabel($fromTs, $toTs);
@@ -97,7 +97,49 @@ class ProcessDetailQuery
         $labelFmt = BucketResolver::labelFormat($bucket, $diff);
 
         if ($pid === null) {
-            return $this->emptyResponse('io', $period, $bucket, $labelFmt);
+            return $this->emptyResponse('info', $period, $bucket, $labelFmt);
+        }
+
+        $stats = DB::connection('process_metrics')->table('process_metrics')
+            ->where('process_name_id', $pid)
+            ->whereBetween('collected_at', [$fromTs, $toTs])
+            ->selectRaw('AVG(count) AS avg, MAX(count) AS max, MIN(count) AS min')
+            ->first();
+
+        $latest = $this->latest($pid);
+
+        // Cheia in chartData se numeste 'info' pentru a fi consistenta cu identificatorul
+        // de metric folosit prin URL/Livewire/JS (vezi process-chart.blade.php).
+        $chartData = $this->bucketSeries($pid, $fromTs, $toTs, $bucket, $labelFmt, [
+            'info' => 'AVG(count)',
+        ]);
+
+        return [
+            'metric'        => 'info',
+            'latest'        => (int)   ($latest->count ?? 0),
+            'avg'           => round((float) ($stats->avg ?? 0), 2),
+            'peak'          => (int)   ($stats->max ?? 0),
+            'min'           => (int)   ($stats->min ?? 0),
+            'periodLabel'   => $period,
+            'bucketSeconds' => $bucket,
+            'labelFormat'   => $labelFmt,
+            'chartData'     => [
+                'labels' => $chartData['labels'],
+                'info'   => $chartData['info'],
+            ],
+        ];
+    }
+
+    public function diskSnapshot(string $name, int $fromTs, int $toTs): array
+    {
+        $pid = $this->processId($name);
+        $period = $this->periodLabel($fromTs, $toTs);
+        $diff = max(1, $toTs - $fromTs);
+        $bucket = BucketResolver::secondsForProcess($diff);
+        $labelFmt = BucketResolver::labelFormat($bucket, $diff);
+
+        if ($pid === null) {
+            return $this->emptyResponse('disk', $period, $bucket, $labelFmt);
         }
 
         $stats = DB::connection('process_metrics')->table('process_metrics')
@@ -117,7 +159,7 @@ class ProcessDetailQuery
         ]);
 
         return [
-            'metric'        => 'io',
+            'metric'        => 'disk',
             'latestRead'    => (int) ($latest->read_bytes  ?? 0),
             'latestWrite'   => (int) ($latest->write_bytes ?? 0),
             'avgRead'       => (int) ($stats->avg_read   ?? 0),
@@ -215,9 +257,10 @@ class ProcessDetailQuery
         ];
 
         return match ($metric) {
-            'cpu' => $base + ['latest' => 0, 'avg' => 0, 'peak' => 0, 'chartData' => $base['chartData'] + ['cpu' => []]],
-            'ram' => $base + ['latest' => 0, 'avg' => 0, 'peak' => 0, 'chartData' => $base['chartData'] + ['ram' => []]],
-            'io'  => $base + [
+            'cpu'  => $base + ['latest' => 0, 'avg' => 0, 'peak' => 0, 'chartData' => $base['chartData'] + ['cpu' => []]],
+            'ram'  => $base + ['latest' => 0, 'avg' => 0, 'peak' => 0, 'chartData' => $base['chartData'] + ['ram' => []]],
+            'info' => $base + ['latest' => 0, 'avg' => 0, 'peak' => 0, 'min' => 0, 'chartData' => $base['chartData'] + ['info' => []]],
+            'disk' => $base + [
                 'latestRead' => 0, 'latestWrite' => 0,
                 'avgRead'    => 0, 'avgWrite'    => 0,
                 'peakRead'   => 0, 'peakWrite'   => 0,

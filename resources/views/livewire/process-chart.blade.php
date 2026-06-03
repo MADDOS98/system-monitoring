@@ -21,7 +21,8 @@
      data-metric="{{ $metric }}"
      data-name="{{ $this->name }}">
 
-    {{-- ─────────────── Summary stat cards ─────────────── --}}
+    {{-- ─────────────── Summary stat cards (omise pentru 'info') ─────────────── --}}
+    @if($metric !== 'info')
     <div class="grid grid-cols-4 gap-4 mb-4">
 
         @switch($metric)
@@ -101,7 +102,7 @@
                 </div>
                 @break
 
-            @case('io')
+            @case('disk')
                 <div class="rounded-lg border border-neutral-800 px-5 py-4">
                     <p class="text-xs font-mono text-neutral-500 uppercase tracking-widest mb-1">Current read</p>
                     <p class="text-2xl font-semibold text-neutral-100">
@@ -133,20 +134,22 @@
         @endswitch
 
     </div>
+    @endif
 
     {{-- ─────────────── Chart card ─────────────── --}}
     <div class="rounded-lg border border-neutral-800 px-5 pt-4 pb-3">
         <div class="flex items-center justify-between mb-3">
             <p class="text-xs font-mono font-semibold text-neutral-200">
                 @switch($metric)
-                    @case('cpu') CPU usage @break
-                    @case('ram') RAM usage @break
-                    @case('io')  Disk I/O @break
+                    @case('cpu')  CPU usage @break
+                    @case('ram')  RAM usage @break
+                    @case('disk') Disk I/O @break
+                    @case('info') Process count @break
                 @endswitch
                 &middot; <span data-period>{{ $periodLabel }}</span>
             </p>
 
-            @if($metric === 'io')
+            @if($metric === 'disk')
                 <div class="flex items-center gap-4 text-[11px] font-mono">
                     <span class="flex items-center gap-1.5">
                         <span class="w-2 h-2 rounded-sm bg-cyan-400"></span>
@@ -155,6 +158,14 @@
                     <span class="flex items-center gap-1.5">
                         <span class="w-2 h-2 rounded-sm bg-orange-400"></span>
                         <span class="text-neutral-400">write</span>
+                    </span>
+                </div>
+            @elseif($metric === 'info')
+                <div class="flex items-center gap-4 text-[11px] font-mono">
+                    <span class="flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-sm bg-purple-400"></span>
+                        <span class="text-neutral-400">count</span>
+                        <span class="text-purple-300" data-stat-latest>{{ $latest }}</span>
                     </span>
                 </div>
             @endif
@@ -234,6 +245,11 @@
         if (label) label.textContent = status;
     }
 
+    // Formateaza valoarea de count (afisata in tab-ul info): integer cand e intreg, 1 zecimala cand e mediat.
+    function fmtCount(n) {
+        return n % 1 === 0 ? String(n) : Number(n).toFixed(1);
+    }
+
     function updateCards(d) {
         setText('[data-period]', d.periodLabel);
         if (metric === 'cpu') {
@@ -247,11 +263,13 @@
             setText('[data-stat-avg]',     fmtKb(d.avg));
             setText('[data-stat-peak]',    fmtKb(d.peak));
             setText('[data-stat-count]',   d.count);
-        } else if (metric === 'io') {
+        } else if (metric === 'disk') {
             setText('[data-stat-current-read]',  fmtBps(d.latestRead));
             setText('[data-stat-current-write]', fmtBps(d.latestWrite));
             setText('[data-stat-peak-read]',     fmtBps(d.peakRead));
             setText('[data-stat-peak-write]',    fmtBps(d.peakWrite));
+        } else if (metric === 'info') {
+            setText('[data-stat-latest]', d.latest);
         }
     }
 
@@ -262,9 +280,11 @@
             chart.data.datasets[0].data = c.cpu;
         } else if (metric === 'ram') {
             chart.data.datasets[0].data = c.ram;
-        } else if (metric === 'io') {
+        } else if (metric === 'disk') {
             chart.data.datasets[0].data = c.read;
             chart.data.datasets[1].data = c.write;
+        } else if (metric === 'info') {
+            chart.data.datasets[0].data = c.info;
         }
         chart.update('none');
     }
@@ -291,7 +311,14 @@
                 borderWidth: 1.8, pointRadius: 0, fill: true, tension: 0.4, spanGaps: true
             }];
             tickCallback = v => fmtKb(v);
-        } else { // io
+        } else if (metric === 'info') {
+            datasets = [{
+                label: 'count', data: data.info || [],
+                borderColor: 'rgb(168, 85, 247)', backgroundColor: 'rgba(168, 85, 247, 0.12)',
+                borderWidth: 1.8, pointRadius: 0, fill: true, tension: 0.4, spanGaps: true
+            }];
+            tickCallback = v => fmtCount(v);
+        } else { // disk
             datasets = [
                 {
                     label: 'read',  data: data.read  || [],
@@ -321,8 +348,9 @@
                         titleFont: { family: 'monospace', size: 11 }, bodyFont: { family: 'monospace', size: 11 },
                         callbacks: {
                             label: ctx => {
-                                if (metric === 'cpu') return ' ' + ctx.dataset.label + ': ' + ctx.parsed.y + '%';
-                                if (metric === 'ram') return ' ' + fmtKb(ctx.parsed.y);
+                                if (metric === 'cpu')  return ' ' + ctx.dataset.label + ': ' + ctx.parsed.y + '%';
+                                if (metric === 'ram')  return ' ' + fmtKb(ctx.parsed.y);
+                                if (metric === 'info') return ' count ' + fmtCount(ctx.parsed.y);
                                 return ' ' + ctx.dataset.label + ': ' + fmtBps(ctx.parsed.y);
                             }
                         }
