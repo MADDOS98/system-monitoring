@@ -1,10 +1,25 @@
 <header class="flex items-center gap-9 p-7 h-12 border-b border-border bg-sidebar sticky top-0 z-10">
 
-    {{-- Breadcrumb --}}
+    {{-- Breadcrumb: derivat din ruta curenta prin view composer (App\Support\Breadcrumb). --}}
     <div class="flex items-center gap-1 text-sm text-muted font-mono">
-        <span class="hover:text-text cursor-pointer transition-colors duration-150">Workspace</span>
-        <span class="mx-1">/</span>
-        <span class="text-text font-medium">{{ $breadcrumb ?? 'Dashboard' }}</span>
+
+        {{-- Sectiunea sidebar (non-clickable: sectiunile nu au landing dedicata). --}}
+        <span>{{ $breadcrumbData['section'] ?? 'Workspace' }}</span>
+
+        @foreach($breadcrumbData['crumbs'] ?? [] as $crumb)
+            <span class="mx-1">/</span>
+            @if(! empty($crumb['url']))
+                <a href="{{ $crumb['url'] }}" wire:navigate
+                   class="hover:text-text transition-colors duration-150">
+                    {{ $crumb['label'] }}
+                </a>
+            @else
+                <span class="{{ $loop->last ? 'text-text font-medium' : '' }}">
+                    {{ $crumb['label'] }}
+                </span>
+            @endif
+        @endforeach
+
     </div>
 
     {{-- Right side --}}
