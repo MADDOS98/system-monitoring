@@ -3,6 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Poll\ApacheLogsController as PollApacheLogsController;
 use App\Http\Controllers\Poll\MetricsController as PollMetricsController;
+use App\Http\Controllers\Poll\ProcessMetricsController as PollProcessMetricsController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ApacheLogController;
 
@@ -36,6 +37,17 @@ Route::get('/processes', fn() => view('processes.index'))
     ->middleware(['auth', 'verified'])
     ->name('processes');
 
+Route::get('/processes/{name}', function (string $name, \Illuminate\Http\Request $request) {
+    $tab = $request->query('tab', 'cpu');
+    if (! in_array($tab, ['cpu', 'ram', 'io'], true)) {
+        $tab = 'cpu';
+    }
+    return view('processes.show', compact('name', 'tab'));
+})
+    ->where('name', '[A-Za-z0-9._-]+')
+    ->middleware(['auth', 'verified'])
+    ->name('processes.show');
+
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -44,8 +56,9 @@ Route::middleware('auth')->group(function () {
 
 // Polling endpoints (JSON) — apelate de poller.js la interval = bucketSeconds.
 Route::middleware(['auth'])->prefix('poll')->group(function () {
-    Route::get('/metrics',     [PollMetricsController::class,    'snapshot'])->name('poll.metrics');
-    Route::get('/apache-logs', [PollApacheLogsController::class, 'snapshot'])->name('poll.apache-logs');
+    Route::get('/metrics',          [PollMetricsController::class,        'snapshot'])->name('poll.metrics');
+    Route::get('/apache-logs',      [PollApacheLogsController::class,     'snapshot'])->name('poll.apache-logs');
+    Route::get('/process-metrics',  [PollProcessMetricsController::class, 'snapshot'])->name('poll.process-metrics');
 });
 
 require __DIR__ . '/auth.php';

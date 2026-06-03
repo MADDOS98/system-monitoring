@@ -26,6 +26,25 @@ class BucketResolver
     }
 
     /**
+     * Varianta pentru process_metrics sample-uite la 15s:
+     * minim 15s sub 20 min (granularitatea sursei), apoi reguli identice.
+     */
+    public static function secondsForProcess(int $diffSeconds): int
+    {
+        $minutes = max(0, $diffSeconds) / 60;
+
+        return match (true) {
+            $minutes <  20     => 15,
+            $minutes <  100    => 60,
+            $minutes <  720    => 300,
+            $minutes <  4320   => 900,
+            $minutes <  20160  => 3600,
+            $minutes <  86400  => 14400,
+            default            => 86400,
+        };
+    }
+
+    /**
      * Varianta pentru metrice sample-uite 1/min (ex. disk_usage):
      * minim 60s sub 12h (granularitatea sursei), apoi reguli identice.
      */

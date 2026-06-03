@@ -123,9 +123,12 @@
                 <div wire:key="proc-{{ $p->id }}"
                      class="grid grid-cols-12 px-4 py-3 items-center bg-[#111111] hover:bg-[#161616] transition-[background-color] duration-100">
 
-                    {{-- Process name (link placeholder pentru pagina de detaliu, viitor) --}}
+                    {{-- Process name — link spre pagina de detaliu cu grafice CPU/RAM/IO --}}
                     <div class="col-span-3 min-w-0">
-                        <span class="text-sm font-mono text-text truncate block">{{ $p->name }}</span>
+                        <a href="{{ route('processes.show', $p->name) }}" wire:navigate
+                           class="text-sm font-mono text-text truncate block hover:text-accent hover:underline transition-colors">
+                            {{ $p->name }}
+                        </a>
                     </div>
 
                     {{-- Count (× N badge) --}}
