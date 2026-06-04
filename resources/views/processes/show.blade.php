@@ -7,29 +7,6 @@
         ->where('name', $name)
         ->exists();
 
-    // Numar total de comenzi distincte (pentru indicatorul "+N more" din header).
-    $commandsTotal = $exists
-        ? DB::connection('process_metrics')
-            ->table('process_commands AS pc')
-            ->join('process_names AS pn', 'pn.id', '=', 'pc.process_name_id')
-            ->where('pn.name', $name)
-            ->count()
-        : 0;
-
-    // In header afisam doar primele 2; restul sunt accesibile prin tab-ul Info.
-    $previewCommands = $exists
-        ? DB::connection('process_metrics')
-            ->table('process_commands AS pc')
-            ->join('process_names AS pn', 'pn.id', '=', 'pc.process_name_id')
-            ->where('pn.name', $name)
-            ->orderBy('pc.id')
-            ->limit(2)
-            ->pluck('pc.command')
-            ->all()
-        : [];
-
-    $hiddenCount = max(0, $commandsTotal - count($previewCommands));
-
     // Info e primul si default. Restul (CPU/RAM/Disk) sunt charts pe metrice
     // de timp; Info combina graficul de count + lista de comenzi.
     $tabs = [
@@ -54,25 +31,6 @@
     </div>
 
     <livewire:time-range-picker :title="'Process: ' . $name" />
-
-    {{-- Preview comenzi (max 2) + link la tab-ul Info daca sunt mai multe --}}
-    @if(! empty($previewCommands))
-        <div class="mb-5 -mt-3 text-xs text-muted font-mono space-y-0.5">
-            @foreach($previewCommands as $cmd)
-                <div class="truncate">{{ $cmd }}</div>
-            @endforeach
-            @if($hiddenCount > 0)
-                <a href="{{ route('processes.show', ['name' => $name, 'tab' => 'info']) }}"
-                   wire:navigate
-                   class="inline-flex items-center gap-1 text-[#6b7280] hover:text-text transition-colors mt-0.5">
-                    + {{ $hiddenCount }} more
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path d="M5 12h14M12 5l7 7-7 7"/>
-                    </svg>
-                </a>
-            @endif
-        </div>
-    @endif
 
     @if(! $exists)
         <div class="rounded-lg border border-border bg-panel p-8 text-center">
