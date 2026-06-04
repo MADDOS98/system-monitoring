@@ -206,10 +206,14 @@ class ApacheLogsQuery
      * curent — strftime("%H", datetime(..., "unixepoch")) ar fi dat ora UTC, ceea ce
      * shifta toata cronologia cu offsetul timezone fata de WHERE-ul deja localizat.
      */
-    public function peakBins(string $day): array
+    public function peakBins(string $day, ?string $tz = null): array
     {
-        $dayStart = Carbon::parse($day)->startOfDay()->timestamp;
-        $dayEnd   = Carbon::parse($day)->endOfDay()->timestamp;
+        // EXPLICIT $tz (default config) pentru ca Carbon::createFromTimestamp
+        // fara tz returneaza UTC indiferent de PHP TZ (mostenit din PHP
+        // DateTime('@ts')). Daca apelantul a pasat tz null, folosim config-ul.
+        $tz       = $tz ?? config('app.timezone');
+        $dayStart = Carbon::parse($day, $tz)->startOfDay()->timestamp;
+        $dayEnd   = Carbon::parse($day, $tz)->endOfDay()->timestamp;
 
         $rows = DB::connection(self::CONNECTION)->table('apache_logs')
             ->whereBetween('log_time', [$dayStart, $dayEnd])

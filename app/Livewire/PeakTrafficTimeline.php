@@ -16,23 +16,31 @@ class PeakTrafficTimeline extends Component
 
     public function mount(): void
     {
-        $this->toDate = Carbon::now()->format('Y-m-d');
-        $this->from   = Carbon::now()->subMinutes(5)->timestamp;
-        $this->to     = Carbon::now()->timestamp;
+        $tz = config('app.timezone');
+
+        $this->toDate = Carbon::now($tz)->format('Y-m-d');
+        $this->from   = Carbon::now($tz)->subMinutes(5)->timestamp;
+        $this->to     = Carbon::now($tz)->timestamp;
     }
 
     #[On('setTimeRange')]
     public function setTimeRange(string $from, string $to): void
     {
+        $tz = config('app.timezone');
+
         $this->from   = (int) $from;
         $this->to     = (int) $to;
-        $this->toDate = Carbon::createFromTimestamp((int) $to)->format('Y-m-d');
+        // EXPLICIT $tz: createFromTimestamp fara tz returneaza UTC indiferent
+        // de PHP TZ (mostenit din PHP DateTime('@ts')). Ar shifta ziua aleasa
+        // cu offset-ul TZ pentru orice $to intre UTC 21:00 si 23:59.
+        $this->toDate = Carbon::createFromTimestamp((int) $to, $tz)->format('Y-m-d');
     }
 
     public function render()
     {
-        $day  = $this->toDate ?? Carbon::now()->format('Y-m-d');
-        $data = app(ApacheLogsQuery::class)->peakBins($day);
+        $tz   = config('app.timezone');
+        $day  = $this->toDate ?? Carbon::now($tz)->format('Y-m-d');
+        $data = app(ApacheLogsQuery::class)->peakBins($day, $tz);
 
         $diff          = max(1, ($this->to ?? 0) - ($this->from ?? 0));
         $bucketSeconds = BucketResolver::secondsFor($diff);

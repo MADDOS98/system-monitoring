@@ -26,16 +26,21 @@ class ApacheLogsController extends Controller
             return response()->json(['error' => 'invalid time range'], 400);
         }
 
+        $tz = config('app.timezone');
+
         // Slide live window pentru consistenta cu Livewire render.
         $diff = $to - $from;
         $isLivePreset = in_array($diff, [300, 3600, 86400], true);
         if ($isLivePreset) {
-            $to   = Carbon::now()->timestamp;
+            $to   = Carbon::now($tz)->timestamp;
             $from = $to - $diff;
         }
 
         $bucketSeconds = BucketResolver::secondsFor(max(1, $diff));
-        $day           = Carbon::createFromTimestamp($to)->format('Y-m-d');
+        // EXPLICIT $tz: createFromTimestamp fara tz returneaza UTC indiferent de
+        // PHP TZ. Ar shifta ziua catre UTC pentru $to-uri seara (local) si poll-ul
+        // ar cere bin-urile zilei UTC, nu ale zilei locale a user-ului.
+        $day           = Carbon::createFromTimestamp($to, $tz)->format('Y-m-d');
 
         $paginator      = $q->paginate($from, $to, $page, $search, $searchField);
         $topIpsPaginator = $q->topIps($from, $to, $tab, $topIpsPage);
@@ -63,7 +68,7 @@ class ApacheLogsController extends Controller
                 'to'        => $topIpsPaginator->lastItem(),
             ],
             'status'  => $q->byStatus($from, $to),
-            'peak'    => $q->peakBins($day),
+            'peak'    => $q->peakBins($day, $tz),
         ]);
     }
 }
