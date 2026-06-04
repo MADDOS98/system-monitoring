@@ -37,10 +37,9 @@ class ApacheLogsController extends Controller
         }
 
         $bucketSeconds = BucketResolver::secondsFor(max(1, $diff));
-        // EXPLICIT $tz: createFromTimestamp fara tz returneaza UTC indiferent de
-        // PHP TZ. Ar shifta ziua catre UTC pentru $to-uri seara (local) si poll-ul
-        // ar cere bin-urile zilei UTC, nu ale zilei locale a user-ului.
-        $day           = Carbon::createFromTimestamp($to, $tz)->format('Y-m-d');
+        // peakBins: live → sliding 24h pana la ora curenta (null endTs).
+        //           custom → ziua locala a $to (endTs = $to).
+        $peakEndTs = $isLivePreset ? null : $to;
 
         $paginator      = $q->paginate($from, $to, $page, $search, $searchField);
         $topIpsPaginator = $q->topIps($from, $to, $tab, $topIpsPage);
@@ -68,7 +67,7 @@ class ApacheLogsController extends Controller
                 'to'        => $topIpsPaginator->lastItem(),
             ],
             'status'  => $q->byStatus($from, $to),
-            'peak'    => $q->peakBins($day, $tz),
+            'peak'    => $q->peakBins($peakEndTs, $tz),
         ]);
     }
 }

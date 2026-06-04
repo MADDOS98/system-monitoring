@@ -199,69 +199,92 @@ class ApacheLogsQuery
     }
 
     /**
-     * 24 bin-uri orare pentru o anumita zi (peak traffic timeline).
+     * 24 bin-uri orare cu fereastra dinamica:
+     *  - $endTs null    → live mode: sliding now-23h → now (aliniat la ora curenta)
+     *  - $endTs setat   → custom mode: ziua LOCALA a $endTs (00:00 → 23:00)
      *
-     * Ora e calculata ca offset fata de $dayStart (care e local midnight, in TZ
-     * userului) impartit la 3600. Asta da hour [0..23] corect aliniat la timezone-ul
-     * curent — strftime("%H", datetime(..., "unixepoch")) ar fi dat ora UTC, ceea ce
-     * shifta toata cronologia cu offsetul timezone fata de WHERE-ul deja localizat.
+     * Aliniat la ore intregi. Bin 0 = cea mai veche, bin 23 = cea mai recenta.
+     * Labels-urile ("HH:00") sunt orele REALE locale — se rotesc cu trecerea timpului
+     * in live mode, raman fixe 00..23 in custom mode (zi calendaristica completa).
+     *
+     * $tz explicit (default config) ca Carbon::createFromTimestamp sa nu cada
+     * pe UTC implicit (mostenit din PHP DateTime('@ts')).
      */
-    public function peakBins(string $day, ?string $tz = null): array
+    public function peakBins(?int $endTs = null, ?string $tz = null): array
     {
-        // EXPLICIT $tz (default config) pentru ca Carbon::createFromTimestamp
-        // fara tz returneaza UTC indiferent de PHP TZ (mostenit din PHP
-        // DateTime('@ts')). Daca apelantul a pasat tz null, folosim config-ul.
-        $tz       = $tz ?? config('app.timezone');
-        $dayStart = Carbon::parse($day, $tz)->startOfDay()->timestamp;
-        $dayEnd   = Carbon::parse($day, $tz)->endOfDay()->timestamp;
+        $tz = $tz ?? config('app.timezone');
 
-        $rows = DB::connection(self::CONNECTION)->table('apache_logs')
-            ->whereBetween('log_time', [$dayStart, $dayEnd])
-            ->selectRaw('CAST((log_time - ?) / 3600 AS INTEGER) as hour, COUNT(*) as total', [$dayStart])
-            ->groupBy('hour')
-            ->orderBy('hour')
-            ->pluck('total', 'hour')
+        if ($endTs === null) {
+            // Live: sliding window ending at the current hour.
+            $end = Carbon::now($tz)->startOfHour();
+        } else {
+            // Custom: end-of-day in $tz, rounded down to start of hour 23.
+            $end = Carbon::createFromTimestamp($endTs, $tz)->endOfDay()->startOfHour();
+        }
+
+        $start = $end->copy()->subHours(23);
+
+        $startTs = $start->timestamp;
+        $endTs   = $end->timestamp + 3599;
+
+        $rows = DB::connection(self::CONNECTION)
+            ->table('apache_logs')
+            ->whereBetween('log_time', [$startTs, $endTs])
+            ->selectRaw(
+                'CAST((log_time - ?) / 3600 AS INTEGER) as hour_index, COUNT(*) as total',
+                [$startTs]
+            )
+            ->groupBy('hour_index')
+            ->pluck('total', 'hour_index')
             ->toArray();
 
-        $bins = [];
-        for ($h = 0; $h < 24; $h++) {
-            $bins[$h] = (int) ($rows[$h] ?? 0);
+        $bins  = [];
+        $hours = [];
+        for ($i = 0; $i < 24; $i++) {
+            $hourStart = $start->copy()->addHours($i);
+            $bins[$i]  = (int) ($rows[$i] ?? 0);
+            $hours[$i] = $hourStart->format('H:00');
         }
 
         $max = max($bins) ?: 1;
 
         $values   = array_values($bins);
-        $mean     = array_sum($values) / count($values);
+        $mean     = array_sum($values) / 24;
         $variance = 0;
-        foreach ($values as $v) $variance += ($v - $mean) ** 2;
-        $variance /= count($values);
+        foreach ($values as $v) {
+            $variance += ($v - $mean) ** 2;
+        }
+        $variance /= 24;
         $std = sqrt($variance) ?: 1;
 
         $levels = [];
-        for ($h = 0; $h < 24; $h++) {
-            $current = $bins[$h];
-            $z       = ($current - $mean) / $std;
-            $prev    = $bins[$h - 1] ?? 0;
-            $next    = $bins[$h + 1] ?? 0;
+        for ($i = 0; $i < 24; $i++) {
+            $current = $bins[$i];
+            $prev    = $bins[$i - 1] ?? 0;
+            $next    = $bins[$i + 1] ?? 0;
 
-            $localPeak = $current >= 50
+            $z = ($current - $mean) / $std;
+
+            $localPeak = $current >= max(50, $mean * 1.5)
                 && $current > ($prev * 1.4)
                 && $current > ($next * 1.4);
 
-            if ($z >= 2.8) {
-                $levels[$h] = 'critical';
+            if ($z >= 3) {
+                $levels[$i] = 'critical';
             } elseif ($z >= 2 || $localPeak) {
-                $levels[$h] = 'warning';
+                $levels[$i] = 'warning';
             } else {
-                $levels[$h] = 'normal';
+                $levels[$i] = 'normal';
             }
         }
 
         return [
             'bins'   => $bins,
+            'hours'  => $hours,
             'max'    => $max,
             'levels' => $levels,
-            'day'    => $day,
+            'start'  => $startTs,
+            'end'    => $endTs,
         ];
     }
 }

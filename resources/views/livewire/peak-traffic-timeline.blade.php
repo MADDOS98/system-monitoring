@@ -1,17 +1,17 @@
 <div wire:key="peak-traffic-timeline"
-     data-bucket-seconds="{{ $bucketSeconds }}"
      data-bins='@json($bins)'
      data-levels='@json($levels)'
+     data-hours='@json($hours)'
      data-max="{{ $max }}"
-     data-day="{{ $day }}"
+     data-start="{{ $start }}"
+     data-end="{{ $end }}"
      class="w-full rounded-lg border border-[#2a2a2a] mb-5 px-5 pt-4 pb-3">
 
     {{-- Header --}}
     <div class="mb-4">
         <p class="text-xs font-mono font-semibold text-[#e5e7eb]">Peak traffic timeline</p>
         <p class="text-[11px] font-mono text-[#6b7280] mt-0.5">
-            24 bins &middot;
-            <span data-day>{{ $day }}</span> &middot;
+            24 bins &middot; last 24h &middot;
             <span data-selected-label class="text-[#93c5fd]" style="display:none"></span>
             <span data-default-label>click to inspect</span>
         </p>
@@ -25,6 +25,7 @@
             $pct      = $max > 0 ? ($count / $max) : 0;
             $heightPx = max(3, (int) round($pct * 108));
             $barLevel = $levels[$h];
+            $hourLbl  = $hours[$h];
             $barIdle  = match($barLevel) {
                 'warning'  => 'bg-orange-600 group-hover:bg-orange-500',
                 'critical' => 'bg-red-700 group-hover:bg-red-600',
@@ -40,7 +41,7 @@
                             pointer-events-none opacity-0 group-hover:opacity-100
                             transition-opacity duration-150 whitespace-nowrap">
                     <div class="bg-[#1a1a1a] border border-[#3a3a3a] rounded px-2 py-1 text-[11px] font-mono text-[#e5e7eb]">
-                        {{ str_pad($h, 2, '0', STR_PAD_LEFT) }}:00 — <span data-tooltip-count>{{ number_format($count) }}</span> req
+                        <span data-tooltip-hour>{{ $hourLbl }}</span> &mdash; <span data-tooltip-count>{{ number_format($count) }}</span> req
                     </div>
                     <div class="w-2 h-2 bg-[#1a1a1a] border-r border-b border-[#3a3a3a] rotate-45 mx-auto -mt-1"></div>
                 </div>
@@ -54,11 +55,12 @@
         @endfor
     </div>
 
-    {{-- Hour labels --}}
+    {{-- Hour labels — orele REALE locale ale ferestrei (rotesc cu trecerea timpului in live). --}}
     <div class="flex gap-[3px] mt-1.5">
         @for ($h = 0; $h < 24; $h++)
-            <div class="flex-1 text-center text-[11px] font-mono text-gray-400">
-                {{ str_pad($h, 2, '0', STR_PAD_LEFT) }}:00
+            <div class="flex-1 text-center text-[11px] font-mono text-gray-400"
+                 data-hour-label data-hour="{{ $h }}">
+                {{ $hours[$h] }}
             </div>
         @endfor
     </div>
@@ -85,7 +87,7 @@
     let selectedHour = null;
 
     function getBins()   { try { return JSON.parse(getRoot()?.dataset.bins   || '[]'); } catch (e) { return []; } }
-    function getLevels() { try { return JSON.parse(getRoot()?.dataset.levels || '[]'); } catch (e) { return []; } }
+    function getHours()  { try { return JSON.parse(getRoot()?.dataset.hours  || '[]'); } catch (e) { return []; } }
 
     function paintBar(barEl, level, active) {
         ALL_BAR_CLASSES.forEach(c => barEl.classList.remove(c));
@@ -94,22 +96,20 @@
         barEl.dataset.level = level;
     }
 
-    function applyData(bins, levels, max, day) {
+    function applyData(bins, levels, max, hours) {
         const root = getRoot();
         if (!root) return;
         root.dataset.bins   = JSON.stringify(bins);
         root.dataset.levels = JSON.stringify(levels);
+        root.dataset.hours  = JSON.stringify(hours);
         root.dataset.max    = String(max);
-        root.dataset.day    = String(day);
-
-        const dayEl = root.querySelector('[data-day]');
-        if (dayEl) dayEl.textContent = day;
 
         const cells = root.querySelectorAll('[data-bar-cell]');
         cells.forEach((cell) => {
             const h     = parseInt(cell.dataset.hour, 10);
             const count = bins[h] ?? 0;
             const lvl   = levels[h] ?? 'normal';
+            const hr    = hours[h] ?? '';
             const pct   = max > 0 ? count / max : 0;
             const px    = Math.max(3, Math.round(pct * 108));
 
@@ -120,6 +120,14 @@
             }
             const tt = cell.querySelector('[data-tooltip-count]');
             if (tt) tt.textContent = Number(count).toLocaleString();
+            const tth = cell.querySelector('[data-tooltip-hour]');
+            if (tth) tth.textContent = hr;
+        });
+
+        // Hour labels se rotesc odata cu trecerea timpului in live mode.
+        root.querySelectorAll('[data-hour-label]').forEach((lbl) => {
+            const h = parseInt(lbl.dataset.hour, 10);
+            lbl.textContent = hours[h] ?? '';
         });
 
         updateSelectedLabel();
@@ -135,9 +143,11 @@
             def.style.display = '';
             return;
         }
-        const bins = getBins();
+        const bins  = getBins();
+        const hours = getHours();
         const count = bins[selectedHour] ?? 0;
-        sel.textContent   = String(selectedHour).padStart(2, '0') + ':00 — ' + Number(count).toLocaleString() + ' requests';
+        const hr    = hours[selectedHour] ?? (String(selectedHour).padStart(2, '0') + ':00');
+        sel.textContent   = hr + ' — ' + Number(count).toLocaleString() + ' requests';
         sel.style.display = '';
         def.style.display = 'none';
     }
@@ -173,9 +183,10 @@
     document.addEventListener('apache-logs-poll', (e) => {
         if (!e.detail?.peak) return;
         const p = e.detail.peak;
-        const binsArr = Array.isArray(p.bins) ? p.bins : Object.values(p.bins);
-        const lvlArr  = Array.isArray(p.levels) ? p.levels : Object.values(p.levels);
-        applyData(binsArr, lvlArr, p.max, p.day);
+        const binsArr  = Array.isArray(p.bins)   ? p.bins   : Object.values(p.bins);
+        const lvlArr   = Array.isArray(p.levels) ? p.levels : Object.values(p.levels);
+        const hoursArr = Array.isArray(p.hours)  ? p.hours  : Object.values(p.hours);
+        applyData(binsArr, lvlArr, p.max, hoursArr);
     });
 
     Livewire.hook('morph.updated', ({ component }) => {

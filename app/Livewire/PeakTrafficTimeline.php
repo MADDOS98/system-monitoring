@@ -3,54 +3,50 @@
 namespace App\Livewire;
 
 use App\Services\Monitoring\ApacheLogsQuery;
-use App\Services\Monitoring\BucketResolver;
 use Carbon\Carbon;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
 class PeakTrafficTimeline extends Component
 {
-    public ?string $toDate = null;
-    public ?int    $from   = null;
-    public ?int    $to     = null;
+    public ?int $from = null;
+    public ?int $to   = null;
 
     public function mount(): void
     {
-        $tz = config('app.timezone');
-
-        $this->toDate = Carbon::now($tz)->format('Y-m-d');
-        $this->from   = Carbon::now($tz)->subMinutes(5)->timestamp;
-        $this->to     = Carbon::now($tz)->timestamp;
+        $tz         = config('app.timezone');
+        $this->to   = Carbon::now($tz)->timestamp;
+        $this->from = $this->to - 300; // default 5m live preset
     }
 
     #[On('setTimeRange')]
     public function setTimeRange(string $from, string $to): void
     {
-        $tz = config('app.timezone');
-
-        $this->from   = (int) $from;
-        $this->to     = (int) $to;
-        // EXPLICIT $tz: createFromTimestamp fara tz returneaza UTC indiferent
-        // de PHP TZ (mostenit din PHP DateTime('@ts')). Ar shifta ziua aleasa
-        // cu offset-ul TZ pentru orice $to intre UTC 21:00 si 23:59.
-        $this->toDate = Carbon::createFromTimestamp((int) $to, $tz)->format('Y-m-d');
+        $this->from = (int) $from;
+        $this->to   = (int) $to;
     }
 
     public function render()
     {
         $tz   = config('app.timezone');
-        $day  = $this->toDate ?? Carbon::now($tz)->format('Y-m-d');
-        $data = app(ApacheLogsQuery::class)->peakBins($day, $tz);
+        $diff = ($this->to ?? 0) - ($this->from ?? 0);
 
-        $diff          = max(1, ($this->to ?? 0) - ($this->from ?? 0));
-        $bucketSeconds = BucketResolver::secondsFor($diff);
+        // Detecteaza live preset prin durata exacta — match cu ApacheLogsTable
+        // si TimeRangePicker (300s = 5m, 3600s = 1h, 86400s = 24h).
+        $isLivePreset = in_array($diff, [300, 3600, 86400], true);
+
+        // Live → sliding 24h pana la ora curenta. Custom → ziua locala a $to.
+        $endTs = $isLivePreset ? null : $this->to;
+
+        $data = app(ApacheLogsQuery::class)->peakBins($endTs, $tz);
 
         return view('livewire.peak-traffic-timeline', [
-            'bins'          => $data['bins'],
-            'max'           => $data['max'],
-            'levels'        => $data['levels'],
-            'day'           => $data['day'],
-            'bucketSeconds' => $bucketSeconds,
+            'bins'   => $data['bins'],
+            'hours'  => $data['hours'],
+            'max'    => $data['max'],
+            'levels' => $data['levels'],
+            'start'  => $data['start'],
+            'end'    => $data['end'],
         ]);
     }
 }
