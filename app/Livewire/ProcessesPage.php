@@ -57,17 +57,18 @@ class ProcessesPage extends Component
 
         $db = DB::connection('process_metrics');
 
-        // Ultimul collected_at per process — folosit ca anchor pentru JOIN-ul cu randul-snapshot.
+        // Ultimul rand per process — ancorat pe MAX(id) (autoincrement, deci insertia
+        // cea mai recenta). E semnificativ mai rapid decat MAX(collected_at): id e
+        // primary key, deci join-ul de mai jos devine lookup direct pe PK, fara scan
+        // suplimentar prin indexul pe collected_at. Functioneaza pentru ca seeder-ul
+        // si simulatorul scriu in ordine cronologica.
         $latest = $db->table('process_metrics')
-            ->select('process_name_id', DB::raw('MAX(collected_at) AS max_at'))
+            ->select('process_name_id', DB::raw('MAX(id) AS max_id'))
             ->groupBy('process_name_id');
 
         $base = $db->table('process_names AS pn')
             ->leftJoinSub($latest, 'latest', 'latest.process_name_id', '=', 'pn.id')
-            ->leftJoin('process_metrics AS pm', function ($j) {
-                $j->on('pm.process_name_id', '=', 'pn.id')
-                  ->on('pm.collected_at', '=', 'latest.max_at');
-            });
+            ->leftJoin('process_metrics AS pm', 'pm.id', '=', 'latest.max_id');
 
         if ($this->search !== '') {
             $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $this->search);
