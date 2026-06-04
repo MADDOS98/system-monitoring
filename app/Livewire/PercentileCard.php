@@ -19,25 +19,22 @@ class PercentileCard extends Component
     {
         $calc = app(PercentileCalculator::class);
 
-        $mainData = $calc->compute(
+        // Un singur apel — compute() returneaza acum si median in acelasi payload.
+        $data = $calc->compute(
             $this->percentile->metric,
             (float) $this->percentile->percentile,
             (int) $this->percentile->window_minutes,
         );
 
-        // Median (P50) ca referinta pentru tick-ul "med" pe slider.
-        // Nu folosim 50% daca percentila e DEJA 50% (evitam dublu tick).
-        $median = ((float) $this->percentile->percentile) === 50.0
-            ? null
-            : $calc->compute(
-                $this->percentile->metric,
-                50.0,
-                (int) $this->percentile->window_minutes,
-            );
+        // Tick-ul "med" pe slider: ascuns daca percentila e exact 50% (median == value,
+        // ar fi tick suprapus). Altfel afisam median-ul din payload.
+        $median = ($data !== null && ((float) $this->percentile->percentile) !== 50.0)
+            ? $data['median']
+            : null;
 
         return view('livewire.percentile-card', [
-            'data'   => $mainData,
-            'median' => $median !== null ? $median['value'] : null,
+            'data'   => $data,
+            'median' => $median,
             'unit'   => $this->unitFor($this->percentile->metric),
         ]);
     }
