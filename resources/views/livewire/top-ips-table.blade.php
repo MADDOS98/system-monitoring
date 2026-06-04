@@ -49,7 +49,7 @@
     {{-- Rows --}}
     <div data-rows-container
          class="overflow-y-auto divide-y divide-[#2a2a2a]"
-         style="height: calc(15 * 54px)">
+         style="max-height: calc(15 * 54px)">
         @forelse ($topIps as $ip)
         @php
         $showTag  = $ip->status !== null;
