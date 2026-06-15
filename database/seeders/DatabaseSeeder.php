@@ -31,5 +31,6 @@ class DatabaseSeeder extends Seeder
         $this->call(ProcessMetricsSeeder::class);
         $this->call(AlertRulesSeeder::class);
         $this->call(PercentilesSeeder::class);
+        $this->call(RetentionSettingsSeeder::class);
     }
 }

@@ -24,6 +24,7 @@ class Breadcrumb
         'apache-logs'    => ['Observability', [['label' => 'Apache Logs', 'url' => null]]],
         'alerts'         => ['Observability', [['label' => 'Alerts',      'url' => null]]],
         'percentiles'    => ['Observability', [['label' => 'Percentiles', 'url' => null]]],
+        'settings'       => ['System',        [['label' => 'Settings',    'url' => null]]],
         'profile.edit'   => ['System',        [['label' => 'Profile',     'url' => null]]],
     ];
 

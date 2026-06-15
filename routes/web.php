@@ -37,6 +37,10 @@ Route::get('/processes', fn() => view('processes.index'))
     ->middleware(['auth', 'verified'])
     ->name('processes');
 
+Route::get('/settings', fn() => view('settings.index'))
+    ->middleware(['auth', 'verified'])
+    ->name('settings');
+
 Route::get('/processes/{name}', function (string $name, \Illuminate\Http\Request $request) {
     $tab = $request->query('tab', 'info');
     if (! in_array($tab, ['info', 'cpu', 'ram', 'disk'], true)) {
