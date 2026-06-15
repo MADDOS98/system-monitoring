@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Poll\ApacheLogsController as PollApacheLogsController;
 use App\Http\Controllers\Poll\MetricsController as PollMetricsController;
 use App\Http\Controllers\Poll\ProcessMetricsController as PollProcessMetricsController;
+use App\Http\Controllers\Poll\ConnectionsController as PollConnectionsController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ApacheLogController;
 
@@ -24,6 +25,14 @@ Route::get('/metrics', function (\Illuminate\Http\Request $request) {
     }
     return view('metrics.index', compact('tab'));
 })->middleware(['auth', 'verified'])->name('metrics');
+
+Route::get('/network/connections', function (\Illuminate\Http\Request $request) {
+    $key = (string) $request->query('key', '');
+    if ($key === '') {
+        return redirect()->route('metrics', ['tab' => 'network']);
+    }
+    return view('network.connection-show', compact('key'));
+})->middleware(['auth', 'verified'])->name('network.connection');
 
 Route::get('/alerts', fn() => view('alerts.index'))
     ->middleware(['auth', 'verified'])
@@ -63,6 +72,7 @@ Route::middleware(['auth'])->prefix('poll')->group(function () {
     Route::get('/metrics',          [PollMetricsController::class,        'snapshot'])->name('poll.metrics');
     Route::get('/apache-logs',      [PollApacheLogsController::class,     'snapshot'])->name('poll.apache-logs');
     Route::get('/process-metrics',  [PollProcessMetricsController::class, 'snapshot'])->name('poll.process-metrics');
+    Route::get('/connection',       [PollConnectionsController::class,    'snapshot'])->name('poll.connection');
 });
 
 require __DIR__ . '/auth.php';

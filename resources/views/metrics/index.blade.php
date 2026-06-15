@@ -1,6 +1,23 @@
 <x-app-layout>
 
-    <livewire:time-range-picker title="Metrics" />
+    {{-- TimeRangePicker + buton IP Groups (doar pe tab=network, pattern identic IP Reputations) --}}
+    <div class="flex items-start gap-3">
+        <div class="flex-1 min-w-0">
+            <livewire:time-range-picker title="Metrics" />
+        </div>
+        @if($tab === 'network')
+            <button type="button"
+                    onclick="Livewire.dispatch('open-connection-ip-groups')"
+                    class="px-3 py-1.5 bg-panel border border-border rounded-md text-xs text-label hover:text-text font-mono transition-colors duration-150 whitespace-nowrap">
+                IP Groups
+            </button>
+        @endif
+    </div>
+
+    {{-- Modal CRUD pentru gruparea IP-urilor (mount-uit doar pe network tab) --}}
+    @if($tab === 'network')
+        <livewire:connection-ip-groups-manager />
+    @endif
 
     {{-- Tabs --}}
     <div>

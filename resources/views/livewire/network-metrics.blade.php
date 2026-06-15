@@ -105,7 +105,22 @@
                             $pctOther  = round($ip['other']       / $total * 100);
                         @endphp
                         <tr class="border-b border-neutral-800/50">
-                            <td class="py-3 pr-4">{{ $ip['ip'] }}</td>
+                            <td class="py-3 pr-4">
+                                @if($ip['is_group'])
+                                    {{-- Grupuri: link spre pagina de detaliu + badge --}}
+                                    <a href="{{ route('network.connection', ['key' => $ip['key']]) }}"
+                                       wire:navigate
+                                       class="inline-flex items-center gap-2 text-emerald-300 hover:text-emerald-200 hover:underline transition-colors">
+                                        <span>{{ $ip['display'] }}</span>
+                                        <span class="text-[10px] font-mono text-emerald-400/70 bg-emerald-500/10 border border-emerald-500/30 rounded px-1 py-px">
+                                            group &middot; {{ count($ip['ips']) }} IPs
+                                        </span>
+                                    </a>
+                                @else
+                                    {{-- IP-uri singulare: text simplu, identic cu varianta pre-grupare --}}
+                                    {{ $ip['display'] }}
+                                @endif
+                            </td>
                             <td class="py-3 px-4 text-right">{{ $ip['total'] }}</td>
                             <td class="py-3 px-4 text-right text-emerald-400">{{ $ip['established'] }}</td>
                             <td class="py-3 px-4 text-right text-neutral-400">{{ $ip['closed'] }}</td>
@@ -187,14 +202,27 @@
             return;
         }
 
+        // URL builder pentru pagina de detaliu (encode pentru :: si alte chars).
+        const detailUrl = (k) => `/network/connections?key=${encodeURIComponent(k)}`;
+
         tbody.innerHTML = byIp.map(row => {
-            const total = Math.max(1, row.total);
+            const total     = Math.max(1, row.total);
             const pctEst    = Math.round(row.established / total * 100);
             const pctClosed = Math.round(row.closed      / total * 100);
             const pctOther  = Math.round(row.other       / total * 100);
+
+            // Display: pentru grupuri → link + badge; pentru non-grup → text plain.
+            const display = escapeHtml(row.display ?? row.ip ?? '');
+            const ipCell = row.is_group
+                ? `<a href="${detailUrl(row.key)}" wire:navigate class="inline-flex items-center gap-2 text-emerald-300 hover:text-emerald-200 hover:underline transition-colors">
+                       <span>${display}</span>
+                       <span class="text-[10px] font-mono text-emerald-400/70 bg-emerald-500/10 border border-emerald-500/30 rounded px-1 py-px">group &middot; ${(row.ips || []).length} IPs</span>
+                   </a>`
+                : display;
+
             return `
                 <tr class="border-b border-neutral-800/50">
-                    <td class="py-3 pr-4">${escapeHtml(row.ip)}</td>
+                    <td class="py-3 pr-4">${ipCell}</td>
                     <td class="py-3 px-4 text-right">${row.total}</td>
                     <td class="py-3 px-4 text-right text-emerald-400">${row.established}</td>
                     <td class="py-3 px-4 text-right text-neutral-400">${row.closed}</td>

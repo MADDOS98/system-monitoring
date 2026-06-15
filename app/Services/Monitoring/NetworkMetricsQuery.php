@@ -2,6 +2,7 @@
 
 namespace App\Services\Monitoring;
 
+use App\Models\ConnectionIpGroup;
 use App\Models\ConnectionMetric;
 use App\Models\NetworkMetric;
 use Carbon\Carbon;
@@ -46,7 +47,8 @@ class NetworkMetricsQuery
             ];
         }
 
-        usort($byIp, fn($a, $b) => $b['total'] <=> $a['total']);
+        // Aplicam gruparea pe baza tabelei connection_ip_groups.
+        $byIp = $this->applyGrouping($byIp);
         $closedOther = $totalClosed + $totalOther;
 
         $bucketSeconds = BucketResolver::secondsFor($diffSeconds);
@@ -69,6 +71,144 @@ class NetworkMetricsQuery
             'totalEstablished' => $totalEstablished,
             'closedOther'      => $closedOther,
             'byIp'             => $byIp,
+        ];
+    }
+
+    /**
+     * Aplica maparea ip → group_name din connection_ip_groups.
+     * IP-urile cu grup se agregheaza intr-un singur rand (sum total/est/closed/other).
+     * IP-urile fara grup raman individuale.
+     *
+     * Returnam fields suplimentare:
+     *  - key:      cheia URL pentru pagina de detaliu (group_name sau ip)
+     *  - display:  ce afisam in tabela (group_name sau ip)
+     *  - is_group: bool, true daca rand-ul reprezinta un grup agregat
+     *  - ips:      array cu IP-urile incluse (1 element pentru non-grup)
+     */
+    private function applyGrouping(array $byIp): array
+    {
+        $groupMap = ConnectionIpGroup::pluck('group_name', 'ip')->toArray();
+
+        $grouped = [];
+        foreach ($byIp as $row) {
+            $isGroup = isset($groupMap[$row['ip']]);
+            $key     = $isGroup ? $groupMap[$row['ip']] : $row['ip'];
+
+            if (! isset($grouped[$key])) {
+                $grouped[$key] = [
+                    'key'         => $key,
+                    'display'     => $key,
+                    'is_group'    => $isGroup,
+                    'total'       => 0,
+                    'established' => 0,
+                    'closed'      => 0,
+                    'other'       => 0,
+                    'ips'         => [],
+                ];
+            }
+
+            $grouped[$key]['total']       += $row['total'];
+            $grouped[$key]['established'] += $row['established'];
+            $grouped[$key]['closed']      += $row['closed'];
+            $grouped[$key]['other']       += $row['other'];
+            $grouped[$key]['ips'][]       = $row['ip'];
+        }
+
+        $result = array_values($grouped);
+        usort($result, fn ($a, $b) => $b['total'] <=> $a['total']);
+        return $result;
+    }
+
+    /**
+     * Snapshot pentru pagina de detaliu /network/connections?key=...
+     * Returneaza chart data (total_connections in timp), plus stats
+     * (current/min/max/avg) si lista IP-urilor agregate.
+     */
+    public function connectionSnapshot(string $key, int $fromTs, int $toTs): array
+    {
+        $tz   = config('app.timezone');
+        $diff = max(1, $toTs - $fromTs);
+
+        // Determinam ce IP-uri agregam: daca $key e un group_name, lista din grup;
+        // altfel e un IP individual, lista cu un singur element.
+        $groupIps = ConnectionIpGroup::where('group_name', $key)->pluck('ip')->toArray();
+        $ips      = ! empty($groupIps) ? $groupIps : [$key];
+        $isGroup  = ! empty($groupIps);
+
+        $bucketSeconds = BucketResolver::secondsForMinutely($diff);
+        $labelFormat   = BucketResolver::labelFormat($bucketSeconds, $diff);
+        $bucketCount   = (int) ceil($diff / $bucketSeconds);
+
+        // SUM(total_connections) per bucket pentru toate IP-urile date.
+        $bucketRows = DB::connection('system_metrics')
+            ->table('connection_metrics')
+            ->selectRaw(
+                '((collected_at - ?) / ?) * ? + ? AS bucket_ts, SUM(total_connections) AS sum_conn',
+                [$fromTs, $bucketSeconds, $bucketSeconds, $fromTs]
+            )
+            ->whereIn('local_ip', $ips)
+            ->whereBetween('collected_at', [$fromTs, $toTs])
+            ->groupBy('bucket_ts')
+            ->get()
+            ->keyBy('bucket_ts');
+
+        $labels = [];
+        $values = [];
+        for ($i = 0; $i < $bucketCount; $i++) {
+            $ts  = $fromTs + $i * $bucketSeconds;
+            $row = $bucketRows->get($ts);
+            $labels[] = Carbon::createFromTimestamp($ts, $tz)->format($labelFormat);
+            $values[] = $row !== null ? (int) $row->sum_conn : 0;
+        }
+
+        $nonZero = array_filter($values);
+        $currentValue = (int) end($values) ?: 0;
+        $maxValue     = ! empty($values)  ? (int) max($values) : 0;
+        $minValue     = ! empty($nonZero) ? (int) min($nonZero) : 0;
+        $avgValue     = ! empty($nonZero) ? round(array_sum($nonZero) / count($nonZero), 1) : 0;
+
+        $periodLabelFormat = $diff >= 86400 ? 'Y-m-d H:i' : 'H:i';
+        $periodLabel = Carbon::createFromTimestamp($fromTs, $tz)->format($periodLabelFormat)
+            . ' – '
+            . Carbon::createFromTimestamp($toTs, $tz)->format($periodLabelFormat);
+
+        // Pentru grupuri: lista IPs cu cel mai recent total_connections per IP
+        // (util pentru a vedea distributia interna a grupului).
+        $perIp = [];
+        if ($isGroup && ! empty($ips)) {
+            $latestPerIp = DB::connection('system_metrics')
+                ->table('connection_metrics')
+                ->selectRaw('local_ip, MAX(id) as max_id')
+                ->whereIn('local_ip', $ips)
+                ->groupBy('local_ip');
+
+            $perIp = DB::connection('system_metrics')
+                ->table('connection_metrics AS cm')
+                ->joinSub($latestPerIp, 'latest', 'latest.max_id', '=', 'cm.id')
+                ->select(['cm.local_ip', 'cm.total_connections', 'cm.collected_at'])
+                ->orderByDesc('cm.total_connections')
+                ->get()
+                ->map(fn ($r) => [
+                    'ip'                => $r->local_ip,
+                    'total_connections' => (int) $r->total_connections,
+                    'collected_at'      => (int) $r->collected_at,
+                ])
+                ->all();
+        }
+
+        return [
+            'key'           => $key,
+            'is_group'      => $isGroup,
+            'ips'           => $ips,
+            'perIp'         => $perIp,
+            'chartData'     => ['labels' => $labels, 'values' => $values],
+            'currentValue'  => $currentValue,
+            'maxValue'      => $maxValue,
+            'minValue'      => $minValue,
+            'avgValue'      => $avgValue,
+            'periodLabel'   => $periodLabel,
+            'bucketSeconds' => $bucketSeconds,
+            'labelFormat'   => $labelFormat,
         ];
     }
 
