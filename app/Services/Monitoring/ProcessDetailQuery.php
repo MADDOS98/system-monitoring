@@ -188,9 +188,13 @@ class ProcessDetailQuery
 
     private function latest(int $pid): ?\stdClass
     {
+        // ORDER BY id DESC: pentru un proces dat, randurile sunt interleaved la fiecare
+        // 16 inserari (simulator scrie toate procesele intr-un tick), deci scanarea PK
+        // descendent gaseste match-ul in <= 16 randuri. Semantic identic cu collected_at
+        // pentru ca id e autoincrement si scrierile sunt cronologice.
         return DB::connection('process_metrics')->table('process_metrics')
             ->where('process_name_id', $pid)
-            ->orderByDesc('collected_at')
+            ->orderByDesc('id')
             ->first(['cpu_pct', 'ram_kb', 'read_bytes', 'write_bytes', 'count', 'collected_at']);
     }
 

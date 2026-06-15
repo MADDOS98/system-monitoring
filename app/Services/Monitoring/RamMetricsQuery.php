@@ -13,7 +13,9 @@ class RamMetricsQuery
         $tz          = config('app.timezone');
         $diffSeconds = max(1, $toTs - $fromTs);
 
-        $latest = RamMetric::orderByDesc('collected_at')->first();
+        // MAX(id) e direct pe PK (B-tree), mai rapid decat MAX(collected_at) si
+        // semantic identic (id e autoincrement, ordinea inserarii = ordinea cronologica).
+        $latest = RamMetric::orderByDesc('id')->first();
 
         $totalKb = $latest?->total_kb ?? 0;
         $usedKb  = $latest?->used_kb  ?? 0;

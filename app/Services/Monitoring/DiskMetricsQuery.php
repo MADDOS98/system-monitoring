@@ -14,8 +14,10 @@ class DiskMetricsQuery
         $tz          = config('app.timezone');
         $diffSeconds = max(1, $toTs - $fromTs);
 
-        $latestIo    = DiskIoMetric::orderByDesc('collected_at')->first();
-        $latestUsage = DiskUsageMetric::orderByDesc('collected_at')->first();
+        // MAX(id) e direct pe PK (B-tree), mai rapid decat MAX(collected_at) si
+        // semantic identic (id e autoincrement, ordinea inserarii = ordinea cronologica).
+        $latestIo    = DiskIoMetric::orderByDesc('id')->first();
+        $latestUsage = DiskUsageMetric::orderByDesc('id')->first();
 
         $readBytes  = $latestIo?->read_bytes  ?? 0;
         $writeBytes = $latestIo?->write_bytes ?? 0;
@@ -171,8 +173,8 @@ class DiskMetricsQuery
             }
         }
 
-        // Current state pentru "days left" forecast.
-        $latest = DiskUsageMetric::orderByDesc('collected_at')->first();
+        // Current state pentru "days left" forecast. ORDER BY id DESC (PK) ca celelalte snapshot-uri.
+        $latest = DiskUsageMetric::orderByDesc('id')->first();
         $totalBytes = (int) ($latest?->total_bytes ?? 0);
         $usedBytes  = (int) ($latest?->used_bytes  ?? 0);
         $freeBytes  = max(0, $totalBytes - $usedBytes);

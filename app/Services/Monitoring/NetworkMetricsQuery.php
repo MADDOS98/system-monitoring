@@ -14,7 +14,9 @@ class NetworkMetricsQuery
         $tz          = config('app.timezone');
         $diffSeconds = max(1, $toTs - $fromTs);
 
-        $latest = NetworkMetric::orderByDesc('collected_at')->first();
+        // MAX(id) e direct pe PK (B-tree), mai rapid decat MAX(collected_at) si
+        // semantic identic (id e autoincrement, ordinea inserarii = ordinea cronologica).
+        $latest = NetworkMetric::orderByDesc('id')->first();
 
         $rxBytes = $latest?->rx_bytes ?? 0;
         $txBytes = $latest?->tx_bytes ?? 0;

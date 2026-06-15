@@ -13,7 +13,9 @@ class CpuMetricsQuery
         $tz          = config('app.timezone');
         $diffSeconds = max(1, $toTs - $fromTs);
 
-        $latest = CpuMetric::orderByDesc('collected_at')->first();
+        // MAX(id) e direct pe PK (B-tree), mai rapid decat MAX(collected_at) si
+        // semantic identic (id e autoincrement, ordinea inserarii = ordinea cronologica).
+        $latest = CpuMetric::orderByDesc('id')->first();
 
         $totalUsage  = $latest?->total_usage  ?? 0;
         $stolenUsage = $latest?->stolen_usage ?? 0;
