@@ -110,8 +110,10 @@
                     class="col-span-1 flex items-center gap-1.5 hover:text-text transition-colors cursor-pointer">
                 Write/s {!! $sortIcon('write_bytes') !!}
             </button>
+            {{-- Status — derivat din last_collected_at, nu sortabil separat (acelasi sort ca Last sample). --}}
+            <div class="col-span-1 flex items-center gap-1.5">Status</div>
             <button type="button" wire:click="sort('last_collected_at')"
-                    class="col-span-2 flex items-center gap-1.5 justify-end hover:text-text transition-colors cursor-pointer">
+                    class="col-span-1 flex items-center gap-1.5 justify-end hover:text-text transition-colors cursor-pointer">
                 Last sample {!! $sortIcon('last_collected_at') !!}
             </button>
         </div>
@@ -162,8 +164,20 @@
                         {{ $fmtBps($p->write_bytes !== null ? (int) $p->write_bytes : null) }}
                     </div>
 
+                    {{-- Status: running (verde) daca a raportat in ultima minuta; stopped (rosu) altfel. --}}
+                    @php
+                        $isRunning = $p->last_collected_at !== null
+                            && (time() - (int) $p->last_collected_at) < 60;
+                    @endphp
+                    <div class="col-span-1">
+                        <span class="inline-flex items-center text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded
+                            {{ $isRunning ? 'bg-green-900 text-green-400' : 'bg-red-900 text-red-400' }}">
+                            {{ $isRunning ? 'running' : 'stopped' }}
+                        </span>
+                    </div>
+
                     {{-- Last sample --}}
-                    <div class="col-span-2 text-xs font-mono text-[#6b7280] text-right">
+                    <div class="col-span-1 text-xs font-mono text-[#6b7280] text-right">
                         {{ $fmtAgo($p->last_collected_at !== null ? (int) $p->last_collected_at : null) }}
                     </div>
 
