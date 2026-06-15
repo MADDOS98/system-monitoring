@@ -130,6 +130,9 @@
         </div>
     </div>
 
+    {{-- Card 5: Disk growth forecast (30-day rolling) --}}
+    <livewire:disk-growth-forecast />
+
 </div>
 
 @script
