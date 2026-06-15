@@ -44,7 +44,7 @@
     <div class="grid grid-cols-6 gap-3">
 
         {{-- CPU USAGE --}}
-        <div class="rounded-lg border border-neutral-800 px-4 py-3 bg-[#0d0d0d]">
+        <div class="rounded-lg border border-neutral-800 px-4 py-3">
             <p class="text-[10px] font-mono text-neutral-500 uppercase tracking-widest mb-2">CPU USAGE</p>
             <p class="text-3xl font-semibold {{ $usageColor($cpuUsage) }}">
                 {{ $cpuUsage }}<span class="text-sm font-normal text-neutral-400">%</span>
@@ -55,7 +55,7 @@
         </div>
 
         {{-- RAM USAGE --}}
-        <div class="rounded-lg border border-neutral-800 px-4 py-3 bg-[#0d0d0d]">
+        <div class="rounded-lg border border-neutral-800 px-4 py-3">
             <p class="text-[10px] font-mono text-neutral-500 uppercase tracking-widest mb-2">RAM USAGE</p>
             <p class="text-3xl font-semibold {{ $usageColor($ramUsedPct) }}">
                 {{ $ramUsedPct }}<span class="text-sm font-normal text-neutral-400">%</span>
@@ -66,7 +66,7 @@
         </div>
 
         {{-- DISK USAGE --}}
-        <div class="rounded-lg border border-neutral-800 px-4 py-3 bg-[#0d0d0d]">
+        <div class="rounded-lg border border-neutral-800 px-4 py-3">
             <p class="text-[10px] font-mono text-neutral-500 uppercase tracking-widest mb-2">DISK USAGE</p>
             <p class="text-3xl font-semibold {{ $usageColor($diskUsedPct) }}">
                 {{ $diskUsedPct }}<span class="text-sm font-normal text-neutral-400">%</span>
@@ -77,7 +77,7 @@
         </div>
 
         {{-- NET THROUGHPUT --}}
-        <div class="rounded-lg border border-neutral-800 px-4 py-3 bg-[#0d0d0d]">
+        <div class="rounded-lg border border-neutral-800 px-4 py-3">
             <p class="text-[10px] font-mono text-neutral-500 uppercase tracking-widest mb-2">NET THROUGHPUT</p>
             <p class="text-3xl font-semibold text-text">
                 {{ $totalMbps }}<span class="text-sm font-normal text-neutral-400">Mbps</span>
@@ -88,7 +88,7 @@
         </div>
 
         {{-- ACTIVE PROCESSES --}}
-        <div class="rounded-lg border border-neutral-800 px-4 py-3 bg-[#0d0d0d]">
+        <div class="rounded-lg border border-neutral-800 px-4 py-3">
             <p class="text-[10px] font-mono text-neutral-500 uppercase tracking-widest mb-2">ACTIVE PROCESSES</p>
             <p class="text-3xl font-semibold text-text">
                 {{ $activeProcessCount }}
@@ -99,7 +99,7 @@
         </div>
 
         {{-- ALERTS --}}
-        <div class="rounded-lg border border-neutral-800 px-4 py-3 bg-[#0d0d0d]">
+        <div class="rounded-lg border border-neutral-800 px-4 py-3">
             <p class="text-[10px] font-mono text-neutral-500 uppercase tracking-widest mb-2">ALERTS</p>
             <p class="text-3xl font-semibold {{ $totalActiveAlerts > 0 ? 'text-red-400' : 'text-emerald-400' }}">
                 {{ $totalActiveAlerts }}
@@ -117,7 +117,7 @@
     <div class="grid grid-cols-12 gap-3">
 
         {{-- Recent alerts (col-7) --}}
-        <div class="col-span-7 rounded-lg border border-neutral-800 bg-[#0d0d0d] flex flex-col">
+        <div class="col-span-7 rounded-lg border border-neutral-800 flex flex-col">
             <div class="flex items-center justify-between px-5 py-4 border-b border-neutral-800 flex-shrink-0">
                 <p class="text-sm font-semibold text-text">Recent alerts</p>
                 @if($critical > 0)
@@ -165,7 +165,7 @@
         <div class="col-span-5 space-y-3">
 
             {{-- Top processes --}}
-            <div class="rounded-lg border border-neutral-800 bg-[#0d0d0d]">
+            <div class="rounded-lg border border-neutral-800">
                 <div class="px-5 py-4 border-b border-neutral-800">
                     <p class="text-sm font-semibold text-text">Top processes</p>
                 </div>
@@ -203,7 +203,7 @@
             </div>
 
             {{-- Storage --}}
-            <div class="rounded-lg border border-neutral-800 bg-[#0d0d0d] px-5 py-4">
+            <div class="rounded-lg border border-neutral-800 px-5 py-4">
                 <div class="flex items-center justify-between mb-3">
                     <p class="text-sm font-semibold text-text">Storage</p>
                     @if($diskUsedPct >= 85)
