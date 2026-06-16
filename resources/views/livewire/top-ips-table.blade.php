@@ -1,14 +1,4 @@
 <div wire:key="top-ips-table"
-    x-data="{
-        selectedIps: [],
-        toggle(ip) {
-            if (this.selectedIps.includes(ip)) {
-                this.selectedIps = this.selectedIps.filter(i => i !== ip);
-            } else {
-                this.selectedIps.push(ip);
-            }
-        }
-    }"
     data-component="top-ips"
     data-tab="{{ $this->tab }}"
     data-page="{{ $topIps->currentPage() }}"
@@ -42,8 +32,7 @@
         <div class="col-span-2 text-[10px] font-mono font-semibold text-[#6b7280] uppercase tracking-widest">Reqs</div>
         <div class="col-span-2 text-[10px] font-mono font-semibold text-[#6b7280] uppercase tracking-widest text-center">Status mix</div>
         <div class="col-span-2 text-[10px] font-mono font-semibold text-[#6b7280] uppercase tracking-widest text-center">BW</div>
-        <div class="col-span-1 text-[10px] font-mono font-semibold text-[#6b7280] uppercase tracking-widest text-right">Last seen</div>
-        <div class="col-span-1"></div>
+        <div class="col-span-2 text-[10px] font-mono font-semibold text-[#6b7280] uppercase tracking-widest text-right">Last seen</div>
     </div>
 
     {{-- Rows --}}
@@ -62,12 +51,6 @@
         $s2 = $ip->s2xx; $s3 = $ip->s3xx; $s4 = $ip->s4xx; $s5 = $ip->s5xx;
         $p2 = $s2; $p3 = $p2 + $s3; $p4 = $p3 + $s4; $p5 = $p4 + $s5;
         $gradient = "linear-gradient(to right, #22c55e 0% {$p2}%, #3b82f6 {$p2}% {$p3}%, #eab308 {$p3}% {$p4}%, #ef4444 {$p4}% {$p5}%)";
-        $rowBgSelected = match($ip->status) {
-        1 => 'bg-green-500/15',
-        2 => 'bg-yellow-500/15',
-        3 => 'bg-red-500/15',
-        default => 'bg-[#111111]',
-        };
         $rowBgIdle = match($ip->status) {
         1 => 'bg-green-500/5',
         2 => 'bg-yellow-500/5',
@@ -75,8 +58,7 @@
         default => 'bg-[#111111]',
         };
         @endphp
-        <div class="relative grid grid-cols-12 px-4 py-2.5 transition-colors duration-100 items-center group"
-             :class="selectedIps.includes('{{ $ip->ip }}') ? '{{ $rowBgSelected }}' : '{{ $rowBgIdle }}'">
+        <div class="relative grid grid-cols-12 px-4 py-2.5 transition-colors duration-100 items-center group {{ $rowBgIdle }}">
             {{-- Overlay transparent care intensifica bg-ul existent la hover --}}
             <div class="absolute inset-0 bg-white opacity-0 group-hover:opacity-[0.04] transition-opacity duration-100 pointer-events-none"></div>
 
@@ -115,28 +97,8 @@
             </div>
 
             {{-- Last seen --}}
-            <div class="col-span-1 text-[10px] font-mono text-[#6b7280] text-right">
+            <div class="col-span-2 text-[10px] font-mono text-[#6b7280] text-right">
                 {{ $ip->last_seen ?? '—' }}
-            </div>
-
-            {{-- Select button --}}
-            <div class="col-span-1 flex justify-end">
-                <button
-                    type="button"
-                    @click="toggle('{{ $ip->ip }}')"
-                    class="w-6 h-6 rounded border flex items-center justify-center transition-colors duration-150"
-                    :class="selectedIps.includes('{{ $ip->ip }}')
-                        ? 'border-accent bg-accent/20 text-accent'
-                        : 'border-[#3a3a3a] bg-[#1a1a1a] text-[#6b7280] hover:border-accent hover:text-accent'">
-                    {{-- Checkmark when selected --}}
-                    <svg x-show="selectedIps.includes('{{ $ip->ip }}')" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                        <path d="M20 6L9 17l-5-5" />
-                    </svg>
-                    {{-- Plus when not --}}
-                    <svg x-show="!selectedIps.includes('{{ $ip->ip }}')" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                        <path d="M12 5v14M5 12h14" />
-                    </svg>
-                </button>
             </div>
 
         </div>
@@ -239,8 +201,7 @@
                     <div class="w-full rounded-full h-1.5" style="background: ${gradient}"></div>
                 </div>
                 <div class="col-span-2 text-xs font-mono text-[#9ca3af] text-center">${escapeHtml(formatBytes(ip.total_bytes))}</div>
-                <div class="col-span-1 text-[10px] font-mono text-[#6b7280] text-right">${escapeHtml(ip.last_seen ?? '—')}</div>
-                <div class="col-span-1"></div>
+                <div class="col-span-2 text-[10px] font-mono text-[#6b7280] text-right">${escapeHtml(ip.last_seen ?? '—')}</div>
             </div>`;
     }
 
