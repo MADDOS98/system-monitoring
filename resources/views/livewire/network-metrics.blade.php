@@ -107,7 +107,6 @@
                         <tr class="border-b border-neutral-800/50">
                             <td class="py-3 pr-4">
                                 @if($ip['is_group'])
-                                    {{-- Grupuri: link spre pagina de detaliu + badge --}}
                                     <a href="{{ route('network.connection', ['key' => $ip['key']]) }}"
                                        wire:navigate
                                        class="inline-flex items-center gap-2 text-emerald-300 hover:text-emerald-200 hover:underline transition-colors">
@@ -117,8 +116,11 @@
                                         </span>
                                     </a>
                                 @else
-                                    {{-- IP-uri singulare: text simplu, identic cu varianta pre-grupare --}}
-                                    {{ $ip['display'] }}
+                                    <a href="{{ route('network.connection', ['key' => $ip['key']]) }}"
+                                       wire:navigate
+                                       class="hover:text-text hover:underline transition-colors">
+                                        {{ $ip['display'] }}
+                                    </a>
                                 @endif
                             </td>
                             <td class="py-3 px-4 text-right">{{ $ip['total'] }}</td>
@@ -211,14 +213,17 @@
             const pctClosed = Math.round(row.closed      / total * 100);
             const pctOther  = Math.round(row.other       / total * 100);
 
-            // Display: pentru grupuri → link + badge; pentru non-grup → text plain.
             const display = escapeHtml(row.display ?? row.ip ?? '');
+            const href    = escapeHtml(detailUrl(row.key));
+
+            // Doar textul IP-ului e link (pattern identic cu processes-page).
+            // Grup: emerald + badge in interior. Non-grup: text plain cu hover→text+underline.
             const ipCell = row.is_group
-                ? `<a href="${detailUrl(row.key)}" wire:navigate class="inline-flex items-center gap-2 text-emerald-300 hover:text-emerald-200 hover:underline transition-colors">
+                ? `<a href="${href}" wire:navigate class="inline-flex items-center gap-2 text-emerald-300 hover:text-emerald-200 hover:underline transition-colors">
                        <span>${display}</span>
                        <span class="text-[10px] font-mono text-emerald-400/70 bg-emerald-500/10 border border-emerald-500/30 rounded px-1 py-px">group &middot; ${(row.ips || []).length} IPs</span>
                    </a>`
-                : display;
+                : `<a href="${href}" wire:navigate class="hover:text-text hover:underline transition-colors">${display}</a>`;
 
             return `
                 <tr class="border-b border-neutral-800/50">
