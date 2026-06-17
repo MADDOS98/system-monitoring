@@ -13,6 +13,6 @@
 
     <livewire:time-range-picker :title="'Connections: ' . $key" />
 
-    <livewire:connection-chart :name="$key" :key="'connection-chart-' . $key" />
+    <livewire:network.connection-chart :name="$key" :key="'connection-chart-' . $key" />
 
 </x-app-layout>

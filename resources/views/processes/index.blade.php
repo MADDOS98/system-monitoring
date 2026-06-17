@@ -1,5 +1,5 @@
 <x-app-layout>
 
-    <livewire:processes-page />
+    <livewire:processes.processes-page />
 
 </x-app-layout>

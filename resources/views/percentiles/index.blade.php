@@ -1,7 +1,7 @@
 <x-app-layout>
 
-    <livewire:percentiles-page />
+    <livewire:percentiles.percentiles-page />
 
-    <livewire:percentiles-manager />
+    <livewire:percentiles.percentiles-manager />
 
 </x-app-layout>

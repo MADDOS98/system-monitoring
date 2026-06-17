@@ -1,5 +1,5 @@
 <x-app-layout>
 
-    <livewire:dashboard-overview />
+    <livewire:dashboard.dashboard-overview />
 
 </x-app-layout>

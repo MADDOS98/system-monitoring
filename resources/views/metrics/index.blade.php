@@ -16,7 +16,7 @@
 
     {{-- Modal CRUD pentru gruparea IP-urilor (mount-uit doar pe network tab) --}}
     @if($tab === 'network')
-        <livewire:connection-ip-groups-manager />
+        <livewire:metrics.connection-ip-groups-manager />
     @endif
 
     {{-- Tabs --}}
@@ -49,18 +49,18 @@
         </div>
 
         {{-- Alerts per Tab --}}
-        <livewire:tab-alerts :tab="$tab" :key="'tab-alerts-' . $tab" />
+        <livewire:metrics.tab-alerts :tab="$tab" :key="'tab-alerts-' . $tab" />
 
         {{-- Tab Content --}}
         @switch($tab)
-            @case('cpu')     <livewire:cpu-metrics />     @break
-            @case('ram')     <livewire:ram-metrics />     @break
-            @case('network') <livewire:network-metrics /> @break
-            @case('disk')    <livewire:disk-metrics />    @break
+            @case('cpu')     <livewire:metrics.cpu-metrics />     @break
+            @case('ram')     <livewire:metrics.ram-metrics />     @break
+            @case('network') <livewire:metrics.network-metrics /> @break
+            @case('disk')    <livewire:metrics.disk-metrics />    @break
         @endswitch
 
         {{-- Percentiles pentru tab-ul curent (la finalul paginii) --}}
-        <livewire:tab-percentiles :tab="$tab" :key="'tab-percentiles-' . $tab" />
+        <livewire:metrics.tab-percentiles :tab="$tab" :key="'tab-percentiles-' . $tab" />
 
     </div>
 

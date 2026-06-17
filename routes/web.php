@@ -6,17 +6,18 @@ use App\Http\Controllers\Poll\MetricsController as PollMetricsController;
 use App\Http\Controllers\Poll\ProcessMetricsController as PollProcessMetricsController;
 use App\Http\Controllers\Poll\ConnectionsController as PollConnectionsController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\ApacheLogController;
 
 Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', fn() => view('dashboard'))
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
 
-Route::get('/apache-logs', [ApacheLogController::class, 'index'])->middleware(['auth', 'verified'])->name('apache-logs');
+Route::get('/apache-logs', fn() => view('apache_logs.index'))
+    ->middleware(['auth', 'verified'])
+    ->name('apache-logs');
 
 Route::get('/metrics', function (\Illuminate\Http\Request $request) {
     $tab = $request->query('tab', 'cpu');

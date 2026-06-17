@@ -63,19 +63,19 @@
             {{-- Tab content --}}
             @if($tab === 'info')
                 {{-- Info: count chart sus + commands list jos --}}
-                <livewire:process-chart
+                <livewire:processes.process-chart
                     :name="$name"
                     metric="info"
                     :key="'process-chart-' . $name . '-info'" />
 
                 <div class="mt-6">
-                    <livewire:process-commands-list
+                    <livewire:processes.process-commands-list
                         :name="$name"
                         :key="'process-commands-' . $name" />
                 </div>
             @else
                 {{-- Chart unic pentru cpu/ram/disk --}}
-                <livewire:process-chart
+                <livewire:processes.process-chart
                     :name="$name"
                     :metric="$tab"
                     :key="'process-chart-' . $name . '-' . $tab" />

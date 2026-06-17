@@ -16,20 +16,20 @@
     </div>
 
     {{-- Modal IP Reputations (mounted gol, devine vizibil cand butonul de mai sus dispatch-uieaza eventul) --}}
-    <livewire:host-reputations />
+    <livewire:apache-logs.host-reputations />
 
     {{-- Peak Traffic Timeline --}}
-    <livewire:peak-traffic-timeline />
+    <livewire:apache-logs.peak-traffic-timeline />
 
     {{-- Tabel principal cu search + paginare — componentă Livewire --}}
     <div class="w-full rounded-lg border border-border overflow-hidden">
-        <livewire:apache-logs-table />
+        <livewire:apache-logs.apache-logs-table />
     </div>
 
     {{-- Tabelele de jos — side by side, aceeași înălțime --}}
     <div class="mt-5 grid grid-cols-2 gap-4">
-        <livewire:top-ips-table />
-        <livewire:status-table />
+        <livewire:apache-logs.top-ips-table />
+        <livewire:apache-logs.status-table />
     </div>
 
 </x-app-layout>

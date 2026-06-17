@@ -8,6 +8,6 @@
         </p>
     </div>
 
-    <livewire:settings-page />
+    <livewire:settings.settings-page />
 
 </x-app-layout>

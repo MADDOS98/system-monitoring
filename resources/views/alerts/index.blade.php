@@ -18,8 +18,8 @@
         </div>
     </div>
 
-    <livewire:alerts-list />
+    <livewire:alerts.alerts-list />
 
-    <livewire:alert-rules-manager />
+    <livewire:alerts.alert-rules-manager />
 
 </x-app-layout>
