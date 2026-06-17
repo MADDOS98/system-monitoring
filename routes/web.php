@@ -7,9 +7,8 @@ use App\Http\Controllers\Poll\ProcessMetricsController as PollProcessMetricsCont
 use App\Http\Controllers\Poll\ConnectionsController as PollConnectionsController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/', fn() => view('welcome'))
+    ->name('welcome');
 
 Route::get('/dashboard', fn() => view('dashboard'))
     ->middleware(['auth', 'verified'])

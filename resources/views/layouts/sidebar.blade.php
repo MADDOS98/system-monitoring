@@ -19,8 +19,14 @@
         </div>
         <nav class="space-y-0.5 px-2">
             <a href="{{ route('dashboard') }}"
-               class="flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150
-                      {{ request()->routeIs('dashboard') ? 'bg-panel text-text' : 'text-label hover:bg-panel hover:text-text' }}">
+               @class([
+                   'group relative flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150',
+                   'bg-panel text-text'                          => request()->routeIs('dashboard'),
+                   'text-label hover:bg-panel hover:text-text'   => ! request()->routeIs('dashboard'),
+               ])>
+                @if(request()->routeIs('dashboard'))
+                    <span aria-hidden="true" class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r bg-live"></span>
+                @endif
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                     <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
                     <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
@@ -28,16 +34,28 @@
                 Dashboard
             </a>
             <a href="{{ route('metrics') }}"
-               class="flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150
-                      {{ request()->routeIs('metrics*') ? 'bg-panel text-text' : 'text-label hover:bg-panel hover:text-text' }}">
+               @class([
+                   'group relative flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150',
+                   'bg-panel text-text'                          => request()->routeIs('metrics*') || request()->routeIs('network.*'),
+                   'text-label hover:bg-panel hover:text-text'   => ! (request()->routeIs('metrics*') || request()->routeIs('network.*')),
+               ])>
+                @if(request()->routeIs('metrics*') || request()->routeIs('network.*'))
+                    <span aria-hidden="true" class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r bg-live"></span>
+                @endif
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
                 </svg>
                 Metrics
             </a>
             <a href="{{ route('processes') }}" wire:navigate
-               class="flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150
-                      {{ request()->routeIs('processes*') ? 'bg-panel text-text' : 'text-label hover:bg-panel hover:text-text' }}">
+               @class([
+                   'group relative flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150',
+                   'bg-panel text-text'                          => request()->routeIs('processes*'),
+                   'text-label hover:bg-panel hover:text-text'   => ! request()->routeIs('processes*'),
+               ])>
+                @if(request()->routeIs('processes*'))
+                    <span aria-hidden="true" class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r bg-live"></span>
+                @endif
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                     <rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h4M14 12h4"/>
                 </svg>
@@ -51,16 +69,28 @@
         </div>
         <nav class="space-y-0.5 px-2">
             <a href="{{ route('apache-logs') }}"
-               class="flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150
-                      {{ request()->routeIs('logs*') ? 'bg-panel text-text' : 'text-label hover:bg-panel hover:text-text' }}">
+               @class([
+                   'group relative flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150',
+                   'bg-panel text-text'                          => request()->routeIs('apache-logs*'),
+                   'text-label hover:bg-panel hover:text-text'   => ! request()->routeIs('apache-logs*'),
+               ])>
+                @if(request()->routeIs('apache-logs*'))
+                    <span aria-hidden="true" class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r bg-live"></span>
+                @endif
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                     <path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h5M8 16h3"/>
                 </svg>
                 Apache Logs
             </a>
             <a href="{{ route('alerts') }}" wire:navigate
-               class="flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150
-                      {{ request()->routeIs('alerts*') ? 'bg-panel text-text' : 'text-label hover:bg-panel hover:text-text' }}">
+               @class([
+                   'group relative flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150',
+                   'bg-panel text-text'                          => request()->routeIs('alerts*'),
+                   'text-label hover:bg-panel hover:text-text'   => ! request()->routeIs('alerts*'),
+               ])>
+                @if(request()->routeIs('alerts*'))
+                    <span aria-hidden="true" class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r bg-live"></span>
+                @endif
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                     <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
                     <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
@@ -73,8 +103,14 @@
                 @endif
             </a>
             <a href="{{ route('percentiles') }}" wire:navigate
-               class="flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150
-                      {{ request()->routeIs('percentiles*') ? 'bg-panel text-text' : 'text-label hover:bg-panel hover:text-text' }}">
+               @class([
+                   'group relative flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150',
+                   'bg-panel text-text'                          => request()->routeIs('percentiles*'),
+                   'text-label hover:bg-panel hover:text-text'   => ! request()->routeIs('percentiles*'),
+               ])>
+                @if(request()->routeIs('percentiles*'))
+                    <span aria-hidden="true" class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r bg-live"></span>
+                @endif
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                     <path d="M3 3v18h18"/>
                     <path d="M7 14l3-3 4 4 5-5"/>
@@ -91,8 +127,14 @@
         </div>
         <nav class="px-2">
             <a href="{{ route('settings') }}" wire:navigate
-               class="flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150
-                      {{ request()->routeIs('settings*') ? 'bg-panel text-text' : 'text-label hover:bg-panel hover:text-text' }}">
+               @class([
+                   'group relative flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150',
+                   'bg-panel text-text'                          => request()->routeIs('settings*'),
+                   'text-label hover:bg-panel hover:text-text'   => ! request()->routeIs('settings*'),
+               ])>
+                @if(request()->routeIs('settings*'))
+                    <span aria-hidden="true" class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r bg-live"></span>
+                @endif
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                     <circle cx="12" cy="12" r="3"/>
                     <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
